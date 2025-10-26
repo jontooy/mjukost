@@ -28,28 +28,25 @@ map.addControl(new maplibregl.NavigationControl(), 'top-right');
 // ----- SPA-like UI logic -----
 const mainTabBar = document.getElementById('main-tab-bar');
 const overlay = document.getElementById('content-overlay');
-const template = document.getElementById('tab-bar-template');
 const tabs = mainTabBar.querySelectorAll('.tab');
 
+function updateActiveTab(tabName) {
+  tabs.forEach(tab => {
+    if (tab.dataset.tab === tabName) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+}
+
 function setOverlayActive(active) {
-  document.body.classList.toggle('overlay-active', active);
   overlay.classList.toggle('active', active);
 }
 
 function renderTabContent(tabName) {
+  updateActiveTab(tabName);
   overlay.innerHTML = '';
-
-  // Clone the tab bar into overlay
-  const clone = template.content.cloneNode(true);
-  overlay.appendChild(clone);
-
-  const innerTabs = overlay.querySelectorAll('.tab');
-  innerTabs.forEach(innerTab => {
-    innerTab.addEventListener('click', e => {
-      e.stopPropagation();
-      renderTabContent(innerTab.dataset.tab);
-    });
-  });
 
   const content = document.createElement('div');
   content.className = 'tab-content';
@@ -57,22 +54,20 @@ function renderTabContent(tabName) {
 
   // --- Content by tab ---
   if (tabName === 'projects') {
-    // Only one project now: Snake
     const grid = document.createElement('div');
     grid.className = 'project-grid';
 
     const card = document.createElement('div');
     card.className = 'project-card';
     card.innerHTML = `<h3>Snake</h3><p>Play the classic Snake game!</p>`;
-    grid.appendChild(card);
 
-    // When Snake card is clicked → start the game
     card.addEventListener('click', e => {
       e.stopPropagation();
-      setOverlayActive(false); // Close the projects overlay
+      setOverlayActive(false);
       startSnakeGame();
     });
 
+    grid.appendChild(card);
     content.appendChild(grid);
   }
   else if (tabName === 'about') {
@@ -95,7 +90,6 @@ function startSnakeGame() {
 
   snakeOverlay.style.display = 'flex';
   gameOverDiv.style.display = 'none';
-  document.body.classList.add('snake-active');
 
   // Calculate canvas size to cover entire screen, keeping tiles constant
   const tileSize = 20;
@@ -201,7 +195,6 @@ function startSnakeGame() {
     if (gameLoopId) clearTimeout(gameLoopId);
     document.removeEventListener('keydown', handleKeyDown);
     snakeOverlay.style.display = 'none';
-    document.body.classList.remove('snake-active');
   };
 
   gameLoop();
@@ -216,18 +209,11 @@ tabs.forEach(tab => {
   });
 });
 
-// ----- Close overlay when clicking outside -----
+// ----- Close overlay when clicking outside content -----
 overlay.addEventListener('click', e => {
-  const clickedInsideTabBar = e.target.closest('.tab-bar');
   const clickedInsideContent = e.target.closest('.tab-content');
-  const clickedInsideCard = e.target.closest('.project-card');
 
-  if (!clickedInsideTabBar && !clickedInsideContent && !clickedInsideCard) {
+  if (!clickedInsideContent) {
     setOverlayActive(false);
   }
-});
-
-// Also close if user clicks on the map directly
-map.getContainer().addEventListener('click', () => {
-  setOverlayActive(false);
 });
