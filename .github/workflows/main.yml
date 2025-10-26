@@ -34,7 +34,7 @@ jobs:
 
       # 6️⃣ Deploy via FTP
       - name: 📂 Deploy dist/ to FTP
-        uses: SamKirkland/FTP-Deploy-Action@4.3.6
+        uses: SamKirkland/FTP-Deploy-Action@4.3.3
         with:
           server: privat.bahnhof.se
           username: wb177909
