@@ -1,12 +1,57 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Mjukost</title>
+  <link rel="stylesheet" href="/src/main.css" />
 </head>
+
 <body>
-  <div id="map" style="width:100vw; height:100vh;"></div>
+  <!-- Hover trigger area -->
+  <div id="hover-zone"></div>
+
+  <!-- Slide-over navigation -->
+  <div id="top-slide">
+    <div class="tab-bar" id="main-tab-bar">
+      <button class="tab" data-tab="projects">Projects</button>
+      <button class="tab" data-tab="about">About</button>
+    </div>
+  </div>
+
+  <!-- Dynamic content area -->
+  <div id="content-overlay"></div>
+
+  <!-- Template for tab bar inside overlay -->
+  <template id="tab-bar-template">
+    <div class="tab-bar overlay-tab-bar">
+      <button class="tab" data-tab="projects">Projects</button>
+      <button class="tab" data-tab="about">About</button>
+    </div>
+  </template>
+
+  <!-- Slide-over navigation -->
+  <div id="top-slide">
+    <div id="main-tab-bar" class="tab-bar">
+      <button class="tab" data-tab="projects">Projects</button>
+      <button class="tab" data-tab="about">About</button>
+    </div>
+  </div>
+
+  <!-- Hidden template for overlay tab bar -->
+  <template id="tab-bar-template">
+    <div class="tab-bar">
+      <button class="tab" data-tab="projects">Projects</button>
+      <button class="tab" data-tab="about">About</button>
+    </div>
+  </template>
+
+
+  <!-- Map container -->
+  <div id="map"></div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>
