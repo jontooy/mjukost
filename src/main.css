@@ -201,3 +201,131 @@ body {
 #restart-snake:hover {
   background: rgba(68, 255, 68, 0.5) !important;
 }
+
+/* Piano overlay */
+#piano-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.95);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#piano-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+#piano-keys {
+  position: relative;
+  display: flex;
+  height: 300px;
+}
+
+.piano-key {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transition: all 0.05s ease;
+}
+
+.white-key {
+  width: 60px;
+  height: 300px;
+  background: linear-gradient(to bottom, #ffffff 0%, #f0f0f0 100%);
+  border: 2px solid #333;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  z-index: 1;
+}
+
+.white-key span {
+  margin-bottom: 20px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+}
+
+.white-key:hover {
+  background: linear-gradient(to bottom, #f0f0f0 0%, #e0e0e0 100%);
+}
+
+.white-key.active {
+  background: linear-gradient(to bottom, #d0d0d0 0%, #c0c0c0 100%);
+  transform: translateY(2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.black-key {
+  width: 40px;
+  height: 180px;
+  background: linear-gradient(to bottom, #2a2a2a 0%, #000000 100%);
+  border: 2px solid #000;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  position: absolute;
+  z-index: 2;
+  margin-left: -20px;
+}
+
+.black-key span {
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.black-key:hover {
+  background: linear-gradient(to bottom, #3a3a3a 0%, #1a1a1a 100%);
+}
+
+.black-key.active {
+  background: linear-gradient(to bottom, #1a1a1a 0%, #000000 100%);
+  transform: translateY(2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Position black keys correctly */
+.black-key[data-note="C#3"] {
+  left: 60px;
+}
+
+.black-key[data-note="D#3"] {
+  left: 120px;
+}
+
+.black-key[data-note="F#3"] {
+  left: 240px;
+}
+
+.black-key[data-note="G#3"] {
+  left: 300px;
+}
+
+.black-key[data-note="A#3"] {
+  left: 360px;
+}
+
+#close-piano {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+#close-piano:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
