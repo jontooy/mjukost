@@ -51,6 +51,20 @@
   <!-- Map container -->
   <div id="map"></div>
 
+  <!-- Snake canvas (hidden by default) -->
+  <canvas id="snake-canvas" style="display: none;"></canvas>
+
+  <!-- Snake game overlay -->
+  <div id="snake-overlay" style="display: none;">
+    <canvas id="snake-game-canvas"></canvas>
+    <div id="snake-game-over" style="display: none;">
+      <h2>Game Over!</h2>
+      <div id="snake-final-score"></div>
+      <button id="restart-snake">Play Again</button>
+      <button id="close-snake">Close Game</button>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 

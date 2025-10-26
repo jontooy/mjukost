@@ -56,13 +56,7 @@ function renderTabContent(tabName) {
   overlay.appendChild(content);
 
   // --- Content by tab ---
-  if (tabName === 'main') {
-    content.innerHTML = `
-      <h2>Welcome to Mjukost</h2>
-      <p>This is your main dashboard.</p>
-    `;
-  }
-  else if (tabName === 'projects') {
+  if (tabName === 'projects') {
     // Only one project now: Snake
     const grid = document.createElement('div');
     grid.className = 'project-grid';
@@ -75,13 +69,11 @@ function renderTabContent(tabName) {
     // When Snake card is clicked → start the game
     card.addEventListener('click', e => {
       e.stopPropagation();
-      renderSnakeGame(content);
+      setOverlayActive(false); // Close the projects overlay
+      startSnakeGame();
     });
 
     content.appendChild(grid);
-  }
-  else if (tabName === 'site') {
-    content.innerHTML = `<h2>Site Info</h2><p>Details about this platform and its features.</p>`;
   }
   else if (tabName === 'about') {
     content.innerHTML = `<h2>About</h2><p>Created with ❤️ using MapLibre GL.</p>`;
@@ -90,34 +82,64 @@ function renderTabContent(tabName) {
   setOverlayActive(true);
 }
 
-// ----- Snake Game Renderer -----
-function renderSnakeGame(container) {
-  container.innerHTML = `
-    <h2>Snake 🐍</h2>
-    <canvas id="snake-canvas" width="400" height="400"></canvas>
-    <p>Use arrow keys to move. Eat the food, avoid hitting yourself!</p>
-  `;
+// ----- Snake Game -----
+let gameLoopId = null;
 
-  const canvas = document.getElementById('snake-canvas');
+function startSnakeGame() {
+  const snakeOverlay = document.getElementById('snake-overlay');
+  const canvas = document.getElementById('snake-game-canvas');
+  const gameOverDiv = document.getElementById('snake-game-over');
+  const finalScoreDisplay = document.getElementById('snake-final-score');
+  const restartBtn = document.getElementById('restart-snake');
+  const closeBtn = document.getElementById('close-snake');
+
+  snakeOverlay.style.display = 'flex';
+  gameOverDiv.style.display = 'none';
+  document.body.classList.add('snake-active');
+
+  // Calculate canvas size to cover entire screen, keeping tiles constant
+  const tileSize = 20;
+  const tilesX = Math.floor(window.innerWidth / tileSize);
+  const tilesY = Math.floor(window.innerHeight / tileSize);
+
+  canvas.width = tilesX * tileSize;
+  canvas.height = tilesY * tileSize;
+
   const ctx = canvas.getContext('2d');
-  const gridSize = 20;
-  const tileCount = canvas.width / gridSize;
 
-  let snake = [{ x: 10, y: 10 }];
+  let snake = [{ x: Math.floor(tilesX / 2), y: Math.floor(tilesY / 2) }];
   let velocity = { x: 0, y: 0 };
-  let food = { x: 5, y: 5 };
+  let food = {
+    x: Math.floor(Math.random() * tilesX),
+    y: Math.floor(Math.random() * tilesY)
+  };
   let score = 0;
+  let gameActive = true;
 
-  document.addEventListener('keydown', e => {
+  function handleKeyDown(e) {
+    if (!gameActive) return;
+
     switch (e.key) {
-      case 'ArrowUp': if (velocity.y === 0) velocity = { x: 0, y: -1 }; break;
-      case 'ArrowDown': if (velocity.y === 0) velocity = { x: 0, y: 1 }; break;
-      case 'ArrowLeft': if (velocity.x === 0) velocity = { x: -1, y: 0 }; break;
-      case 'ArrowRight': if (velocity.x === 0) velocity = { x: 1, y: 0 }; break;
+      case 'ArrowUp':
+        if (velocity.y === 0) velocity = { x: 0, y: -1 };
+        break;
+      case 'ArrowDown':
+        if (velocity.y === 0) velocity = { x: 0, y: 1 };
+        break;
+      case 'ArrowLeft':
+        if (velocity.x === 0) velocity = { x: -1, y: 0 };
+        break;
+      case 'ArrowRight':
+        if (velocity.x === 0) velocity = { x: 1, y: 0 };
+        break;
     }
-  });
+  }
+
+  document.addEventListener('keydown', handleKeyDown);
 
   function gameLoop() {
+    if (!gameActive) return;
+
     // Move
     const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
     snake.unshift(head);
@@ -126,8 +148,8 @@ function renderSnakeGame(container) {
     if (head.x === food.x && head.y === food.y) {
       score++;
       food = {
-        x: Math.floor(Math.random() * tileCount),
-        y: Math.floor(Math.random() * tileCount)
+        x: Math.floor(Math.random() * tilesX),
+        y: Math.floor(Math.random() * tilesY)
       };
     } else {
       snake.pop();
@@ -136,35 +158,51 @@ function renderSnakeGame(container) {
     // Check collisions (walls or self)
     if (
       head.x < 0 || head.y < 0 ||
-      head.x >= tileCount || head.y >= tileCount ||
+      head.x >= tilesX || head.y >= tilesY ||
       snake.slice(1).some(s => s.x === head.x && s.y === head.y)
     ) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'red';
-      ctx.font = '24px sans-serif';
-      ctx.fillText('Game Over!', 140, 200);
-      ctx.fillStyle = 'white';
-      ctx.fillText(`Score: ${score}`, 160, 240);
-      return; // stop loop
+      gameActive = false;
+      document.removeEventListener('keydown', handleKeyDown);
+      finalScoreDisplay.textContent = `Score: ${score}`;
+      gameOverDiv.style.display = 'block';
+      return;
     }
 
     // Draw everything
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw food
-    ctx.fillStyle = 'red';
-    ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+    ctx.fillStyle = '#ff4444';
+    ctx.fillRect(food.x * tileSize, food.y * tileSize, tileSize - 2, tileSize - 2);
 
     // Draw snake
-    ctx.fillStyle = 'lime';
-    snake.forEach(part => {
-      ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 2, gridSize - 2);
+    snake.forEach((part, index) => {
+      if (index === 0) {
+        ctx.fillStyle = '#88ff88'; // Lighter head
+      } else {
+        ctx.fillStyle = '#44ff44';
+      }
+      ctx.fillRect(part.x * tileSize, part.y * tileSize, tileSize - 2, tileSize - 2);
     });
 
-    setTimeout(gameLoop, 100);
+    gameLoopId = setTimeout(gameLoop, 100);
   }
+
+  restartBtn.onclick = () => {
+    gameActive = false;
+    if (gameLoopId) clearTimeout(gameLoopId);
+    document.removeEventListener('keydown', handleKeyDown);
+    startSnakeGame();
+  };
+
+  closeBtn.onclick = () => {
+    gameActive = false;
+    if (gameLoopId) clearTimeout(gameLoopId);
+    document.removeEventListener('keydown', handleKeyDown);
+    snakeOverlay.style.display = 'none';
+    document.body.classList.remove('snake-active');
+  };
 
   gameLoop();
 }
