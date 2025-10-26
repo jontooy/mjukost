@@ -1,30 +1,44 @@
-on: push
-name: 🚀 Deploy website on push
+name: 🚀 Deploy MapLibre Website
+
+on:
+  push:
+    branches:
+      - main   # or the branch you want to trigger deploy
 
 jobs:
-  web-deploy:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      # 1️⃣ Checkout the repository
+      - name: 🚚 Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      # 2️⃣ Setup Node.js (Yarn comes with Node)
+      - name: 📦 Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
+      # 3️⃣ Install dependencies with Yarn
+      - name: 🧶 Install dependencies
+        run: yarn install --frozen-lockfile
 
-      - name: Build project
-        run: npm run build
+      # 4️⃣ Build the Vite project
+      - name: 🏗️ Build project
+        run: yarn build
 
-      - name: Deploy via FTP
+      # 5️⃣ Optional debug: check dist folder
+      - name: 📂 List dist contents
+        run: ls -R dist
+
+      # 6️⃣ Deploy via FTP
+      - name: 📂 Deploy dist/ to FTP
         uses: SamKirkland/FTP-Deploy-Action@4.3.3
         with:
           server: privat.bahnhof.se
           username: wb177909
           password: ${{ secrets.ftp_password }}
           local-dir: dist
-          server-dir: public_html
-          delete: true
+          server-dir: /          # root of your FTP, matches your webroot
+          delete: true           # remove old files before uploading
