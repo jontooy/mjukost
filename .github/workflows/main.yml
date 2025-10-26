@@ -39,6 +39,6 @@ jobs:
           server: privat.bahnhof.se
           username: wb177909
           password: ${{ secrets.ftp_password }}
-          local-dir: dist
+          local-dir: dist/
           server-dir: /          # root of your FTP, matches your webroot
-          delete: true           # remove old files before uploading
+          dangerous-clean-slate: true
