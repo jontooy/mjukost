@@ -3,36 +3,27 @@ name: 🚀 Deploy MapLibre Website
 on:
   push:
     branches:
-      - main   # or the branch you want to trigger deploy
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repository
       - name: 🚚 Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Setup Node.js (Yarn comes with Node)
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      # 3️⃣ Install dependencies with Yarn
       - name: 🧶 Install dependencies
         run: yarn install --frozen-lockfile
 
-      # 4️⃣ Build the Vite project
       - name: 🏗️ Build project
         run: yarn build
 
-      # 5️⃣ Optional debug: check dist folder
-      - name: 📂 List dist contents
-        run: ls -R dist
-
-      # 6️⃣ Deploy via FTP
       - name: 📂 Deploy dist/ to FTP
         uses: SamKirkland/FTP-Deploy-Action@4.3.3
         with:
