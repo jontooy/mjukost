@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "maplibre-gl": "^5.10.0",
-    "tone": "^15.1.22"
+    "tone": "^15.1.22",
+    "@supabase/supabase-js": "^2.38.4"
   },
   "scripts": {
     "dev": "vite",

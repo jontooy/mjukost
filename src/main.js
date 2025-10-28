@@ -1,7 +1,13 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibregl from 'maplibre-gl';
 import * as Tone from 'tone';
+import { createClient } from '@supabase/supabase-js';
 import './main.css';
+
+// Supabase configuration
+const supabaseUrl = 'https://wdqxlhioavgcjasfvpmu.supabase.co';
+const supabaseKey = 'sb_publishable_sFCrXr8mu68TOvAnvMvjjA_2hArQc7J';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ----- Initialize map -----
 const style = {
@@ -91,6 +97,51 @@ function renderTabContent(tabName) {
 
 // ----- Snake Game -----
 let gameLoopId = null;
+let highScores = [];
+
+// High score functions using Supabase
+async function loadHighScores() {
+  try {
+    const { data, error } = await supabase
+      .from('highscores')
+      .select('name, score')
+      .order('score', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error('Failed to load high scores:', error);
+      highScores = [];
+    } else {
+      highScores = data || [];
+    }
+  } catch (error) {
+    console.error('Failed to load high scores:', error);
+    highScores = [];
+  }
+}
+
+function isHighScore(score) {
+  return highScores.length < 10 || score > (highScores[highScores.length - 1]?.score || 0);
+}
+
+async function addHighScore(name, score) {
+  try {
+    // Insert new score into Supabase
+    const { data, error } = await supabase
+      .from('highscores')
+      .insert([{ name: name.trim(), score }]);
+
+    if (error) {
+      console.error('Failed to save high score:', error);
+    } else {
+      console.log('High score saved to Supabase!');
+      // Reload high scores to get updated list
+      await loadHighScores();
+    }
+  } catch (error) {
+    console.error('Failed to save high score:', error);
+  }
+}
 
 function startSnakeGame() {
   const snakeOverlay = document.getElementById('snake-overlay');
@@ -102,6 +153,9 @@ function startSnakeGame() {
 
   snakeOverlay.style.display = 'flex';
   gameOverDiv.style.display = 'none';
+
+  // Load high scores when game starts
+  loadHighScores();
 
   // Calculate canvas size to cover entire screen, keeping tiles constant
   const tileSize = 20;
@@ -169,6 +223,15 @@ function startSnakeGame() {
     ) {
       gameActive = false;
       document.removeEventListener('keydown', handleKeyDown);
+
+      // Check if this is a high score
+      if (isHighScore(score)) {
+        const playerName = prompt(`🎉 New High Score! Score: ${score}\nEnter your name:`);
+        if (playerName && playerName.trim()) {
+          addHighScore(playerName.trim(), score);
+        }
+      }
+
       finalScoreDisplay.textContent = `Score: ${score}`;
       gameOverDiv.style.display = 'block';
       return;
@@ -195,11 +258,46 @@ function startSnakeGame() {
     gameLoopId = setTimeout(gameLoop, 100);
   }
 
+  // High score display function
+  function displayHighScores() {
+    const highScoresDiv = document.getElementById('snake-high-scores');
+    const highScoresList = document.getElementById('high-scores-list');
+
+    highScoresList.innerHTML = '';
+
+    if (highScores.length === 0) {
+      highScoresList.innerHTML = '<p>No high scores yet!</p>';
+    } else {
+      highScores.forEach((score, index) => {
+        const scoreDiv = document.createElement('div');
+        scoreDiv.className = 'high-score-item';
+        scoreDiv.innerHTML = `
+          <span class="rank">${index + 1}.</span>
+          <span class="name">${score.name}</span>
+          <span class="score">${score.score}</span>
+        `;
+        highScoresList.appendChild(scoreDiv);
+      });
+    }
+
+    highScoresDiv.style.display = 'block';
+  }
+
   restartBtn.onclick = () => {
     gameActive = false;
     if (gameLoopId) clearTimeout(gameLoopId);
     document.removeEventListener('keydown', handleKeyDown);
     startSnakeGame();
+  };
+
+  const viewHighScoresBtn = document.getElementById('view-high-scores');
+  viewHighScoresBtn.onclick = () => {
+    displayHighScores();
+  };
+
+  const closeHighScoresBtn = document.getElementById('close-high-scores');
+  closeHighScoresBtn.onclick = () => {
+    document.getElementById('snake-high-scores').style.display = 'none';
   };
 
   closeBtn.onclick = () => {
