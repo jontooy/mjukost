@@ -1,57 +1,55 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mjukost</title>
+    <link rel="stylesheet" href="/src/css/main.css" />
+  </head>
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mjukost</title>
-  <link rel="stylesheet" href="/src/main.css" />
-</head>
+  <body>
+    <!-- Hover trigger area -->
+    <div id="hover-zone"></div>
 
-<body>
-  <!-- Hover trigger area -->
-  <div id="hover-zone"></div>
-
-  <!-- Slide-over navigation -->
-  <div id="top-slide">
-    <div class="tab-bar" id="main-tab-bar">
-      <button class="tab" data-tab="projects">Projects</button>
-      <button class="tab" data-tab="about">About</button>
+    <!-- Slide-over navigation -->
+    <div id="top-slide">
+      <div class="tab-bar" id="main-tab-bar">
+        <button class="tab" data-tab="projects">Projects</button>
+        <button class="tab" data-tab="about">About</button>
+      </div>
     </div>
-  </div>
 
-  <!-- Dynamic content area -->
-  <div id="content-overlay"></div>
+    <!-- Dynamic content area -->
+    <div id="content-overlay"></div>
 
-  <!-- Map container -->
-  <div id="map"></div>
+    <!-- Map container -->
+    <div id="map"></div>
 
-  <!-- Snake game overlay -->
-  <div id="snake-overlay" style="display: none;">
-    <canvas id="snake-game-canvas"></canvas>
-    <div id="snake-game-over" style="display: none;">
-      <h2>Game Over!</h2>
-      <div id="snake-final-score"></div>
-      <button id="restart-snake">Play Again</button>
-      <button id="view-high-scores">High Scores</button>
-      <button id="close-snake">Close Game</button>
+    <!-- Snake game overlay -->
+    <div id="snake-overlay" style="display: none">
+      <canvas id="snake-game-canvas"></canvas>
+      <div id="snake-game-over" style="display: none">
+        <h2>Game Over!</h2>
+        <div id="snake-final-score"></div>
+        <button id="restart-snake">Play Again</button>
+        <button id="view-high-scores">High Scores</button>
+        <button id="close-snake">Close Game</button>
+      </div>
+      <div id="snake-high-scores" style="display: none">
+        <h3>High Scores</h3>
+        <div id="high-scores-list"></div>
+        <button id="close-high-scores">Close</button>
+      </div>
     </div>
-    <div id="snake-high-scores" style="display: none;">
-      <h3>High Scores</h3>
-      <div id="high-scores-list"></div>
-      <button id="close-high-scores">Close</button>
+
+    <!-- Piano overlay -->
+    <div id="piano-overlay" style="display: none">
+      <div id="piano-container">
+        <div id="piano-keys"></div>
+        <button id="close-piano">Close Piano</button>
+      </div>
     </div>
-  </div>
 
-  <!-- Piano overlay -->
-  <div id="piano-overlay" style="display: none;">
-    <div id="piano-container">
-      <div id="piano-keys"></div>
-      <button id="close-piano">Close Piano</button>
-    </div>
-  </div>
-
-  <script type="module" src="/src/main.js"></script>
-</body>
-
+    <script type="module" src="/src/js/main.js"></script>
+  </body>
 </html>
