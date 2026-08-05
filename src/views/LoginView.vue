@@ -30,6 +30,9 @@ async function onSubmit() {
 
 <template>
   <main class="login">
+    <p class="back">
+      <RouterLink :to="{ name: 'home' }">← Back</RouterLink>
+    </p>
     <h1>Sign in</h1>
     <p class="hint">Use your email and password.</p>
 
@@ -58,6 +61,15 @@ async function onSubmit() {
   max-width: 22rem;
   margin: 4rem auto;
   padding: 0 1rem;
+}
+
+.back {
+  margin: 0 0 1rem;
+}
+
+.back a {
+  color: #555;
+  font-size: 0.9rem;
 }
 
 h1 {
