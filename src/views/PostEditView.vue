@@ -69,8 +69,8 @@ onMounted(loadPost)
   <div class="min-h-screen">
     <AppHeader />
 
-    <main class="mx-auto max-w-[40rem] px-4 pb-12">
-      <h1 class="mb-5 text-2xl font-normal">
+    <main class="mx-auto max-w-[40rem] px-3 pb-10 sm:px-4 sm:pb-12">
+      <h1 class="mb-4 text-xl font-normal sm:mb-5 sm:text-2xl">
         {{ privateMode.active ? 'Edit note' : 'Edit post' }}
       </h1>
 

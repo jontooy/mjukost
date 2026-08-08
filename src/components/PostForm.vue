@@ -101,7 +101,7 @@ function onSubmit() {
       Title
       <input
         v-model="title"
-        class="rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] font-inherit text-ink disabled:cursor-not-allowed disabled:opacity-60"
+        class="w-full min-h-11 rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] text-base font-inherit text-ink disabled:cursor-not-allowed disabled:opacity-60"
         type="text"
         required
         maxlength="200"
@@ -114,8 +114,8 @@ function onSubmit() {
       <textarea
         ref="bodyEl"
         v-model="body"
-        class="resize-y rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] font-mono leading-[1.45] text-ink disabled:cursor-not-allowed disabled:opacity-60"
-        rows="14"
+        class="min-h-[12rem] w-full resize-y rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] font-mono text-base leading-[1.45] text-ink disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[18rem]"
+        rows="10"
         required
         :disabled="busy"
       />
@@ -123,7 +123,7 @@ function onSubmit() {
 
     <div class="grid gap-[0.35rem]">
       <label
-        class="inline-flex cursor-pointer items-center justify-self-start rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.45rem] text-[0.9rem] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+        class="inline-flex min-h-11 cursor-pointer items-center justify-self-stretch rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.45rem] text-[0.9rem] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 sm:justify-self-start"
       >
         {{ uploading ? 'Uploading…' : 'Add image' }}
         <input
@@ -141,7 +141,7 @@ function onSubmit() {
 
     <button
       type="submit"
-      class="justify-self-start cursor-pointer rounded-[0.35rem] border-0 bg-ink px-[0.9rem] py-[0.65rem] font-inherit text-page disabled:cursor-not-allowed disabled:opacity-60"
+      class="w-full min-h-11 cursor-pointer rounded-[0.35rem] border-0 bg-ink px-[0.9rem] py-[0.65rem] font-inherit text-page disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:justify-self-start"
       :disabled="busy"
     >
       {{ props.loading ? 'Saving…' : label }}

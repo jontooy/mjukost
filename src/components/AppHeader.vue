@@ -36,7 +36,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <header class="mx-auto flex max-w-[40rem] items-center justify-between gap-4 px-4 py-5">
+  <header
+    class="mx-auto flex max-w-[40rem] items-center justify-between gap-3 px-3 py-4 sm:gap-4 sm:px-4 sm:py-5"
+  >
     <RouterLink
       class="inline-block text-xl font-bold text-inherit no-underline transition-transform duration-500 ease-in-out"
       :class="privateMode.active ? 'rotate-180' : 'rotate-0'"
@@ -45,14 +47,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       mjukost
     </RouterLink>
 
-    <div class="flex flex-wrap items-center justify-end gap-3">
+    <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
       <template v-if="auth.isAuthenticated">
-        <RouterLink class="text-[0.9rem] text-inherit" :to="{ name: 'post-create' }">
+        <RouterLink
+          class="inline-flex min-h-11 items-center text-[0.9rem] text-inherit sm:min-h-0"
+          :to="{ name: 'post-create' }"
+        >
           {{ privateMode.active ? 'New note' : 'New post' }}
         </RouterLink>
         <button
           type="button"
-          class="cursor-pointer rounded-[0.35rem] border border-border bg-surface px-[0.65rem] py-[0.35rem] text-[0.9rem] font-inherit text-ink"
+          class="min-h-11 cursor-pointer rounded-[0.35rem] border border-border bg-surface px-[0.65rem] py-[0.35rem] text-[0.9rem] font-inherit text-ink sm:min-h-0"
           @click="onSignOut"
         >
           Sign out
@@ -60,7 +65,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       </template>
       <RouterLink
         v-else-if="route.name !== 'login'"
-        class="text-[0.9rem] text-page transition-colors hover:text-ink"
+        class="inline-flex min-h-11 items-center text-[0.9rem] text-page transition-colors hover:text-ink sm:min-h-0"
         :to="{ name: 'login' }"
       >
         Sign in

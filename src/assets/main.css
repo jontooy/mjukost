@@ -26,22 +26,25 @@
   }
 
   body {
-    @apply m-0 bg-page font-sans leading-normal text-ink transition-colors duration-200;
+    @apply m-0 bg-page font-sans text-base leading-normal text-ink transition-colors duration-200;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
 @layer components {
   .post-body {
+    overflow-wrap: anywhere;
+
     h1 {
-      @apply mb-3 mt-6 text-[1.75rem] font-bold leading-tight first:mt-0;
+      @apply mb-3 mt-6 text-[1.45rem] font-bold leading-tight first:mt-0 sm:text-[1.75rem];
     }
 
     h2 {
-      @apply mb-2.5 mt-5 text-[1.4rem] font-bold leading-tight first:mt-0;
+      @apply mb-2.5 mt-5 text-[1.25rem] font-bold leading-tight first:mt-0 sm:text-[1.4rem];
     }
 
     h3 {
-      @apply mb-2 mt-4 text-[1.2rem] font-semibold leading-snug first:mt-0;
+      @apply mb-2 mt-4 text-[1.1rem] font-semibold leading-snug first:mt-0 sm:text-[1.2rem];
     }
 
     h4,

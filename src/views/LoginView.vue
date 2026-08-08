@@ -33,13 +33,13 @@ async function onSubmit() {
   <div class="min-h-screen">
     <AppHeader />
 
-    <main class="mx-auto mt-8 max-w-[22rem] px-4">
+    <main class="mx-auto mt-6 max-w-[22rem] px-3 pb-10 sm:mt-8 sm:px-4 sm:pb-12">
       <form class="grid gap-4" @submit.prevent="onSubmit">
         <label class="grid gap-[0.35rem] text-[0.9rem]">
           Email
           <input
             v-model="email"
-            class="rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] font-inherit text-ink"
+            class="w-full min-h-11 rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] text-base font-inherit text-ink"
             type="email"
             autocomplete="username"
             required
@@ -50,7 +50,7 @@ async function onSubmit() {
           Password
           <input
             v-model="password"
-            class="rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] font-inherit text-ink"
+            class="w-full min-h-11 rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] text-base font-inherit text-ink"
             type="password"
             autocomplete="current-password"
             required
@@ -63,7 +63,7 @@ async function onSubmit() {
 
         <button
           type="submit"
-          class="cursor-pointer rounded-[0.35rem] border-0 bg-ink px-[0.9rem] py-[0.65rem] font-inherit text-page disabled:cursor-not-allowed disabled:opacity-60"
+          class="w-full min-h-11 cursor-pointer rounded-[0.35rem] border-0 bg-ink px-[0.9rem] py-[0.65rem] font-inherit text-page disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="loading"
         >
           {{ loading ? 'Signing in…' : 'Sign in' }}

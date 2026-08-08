@@ -79,7 +79,7 @@ onMounted(loadPosts)
   <div class="min-h-screen">
     <AppHeader />
 
-    <main class="mx-auto max-w-[40rem] px-4 pb-12">
+    <main class="mx-auto max-w-[40rem] px-3 pb-10 sm:px-4 sm:pb-12">
       <div
         v-if="loading"
         class="grid min-h-[calc(100vh-6rem)] place-items-center opacity-45"
@@ -97,24 +97,29 @@ onMounted(loadPosts)
 
       <section v-else class="grid gap-8">
         <article v-for="post in posts" :key="post.id">
-          <header class="mb-3 flex items-start justify-between gap-4">
-            <div>
-              <h2 class="m-0 text-[1.4rem]">{{ post.title }}</h2>
+          <header
+            class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+          >
+            <div class="min-w-0">
+              <h2 class="m-0 text-xl break-words sm:text-[1.4rem]">{{ post.title }}</h2>
               <time class="text-[0.85rem] text-subtle" :datetime="post.created_at">
                 {{ formatDate(post.created_at) }}
               </time>
             </div>
 
-            <div v-if="auth.isAuthenticated" class="flex shrink-0 items-center gap-[0.65rem]">
+            <div
+              v-if="auth.isAuthenticated"
+              class="flex items-center gap-3 sm:shrink-0 sm:gap-[0.65rem]"
+            >
               <RouterLink
-                class="text-[0.9rem] text-inherit"
+                class="inline-flex min-h-11 items-center text-[0.9rem] text-inherit sm:min-h-0"
                 :to="{ name: 'post-edit', params: { id: post.id } }"
               >
                 Edit
               </RouterLink>
               <button
                 type="button"
-                class="cursor-pointer rounded-[0.35rem] border border-border bg-surface px-[0.55rem] py-[0.3rem] text-[0.85rem] font-inherit text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                class="min-h-11 cursor-pointer rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-inherit text-ink disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0 sm:px-[0.55rem] sm:py-[0.3rem]"
                 :disabled="deletingId === post.id"
                 @click="onDelete(post)"
               >
