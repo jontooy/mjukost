@@ -45,9 +45,7 @@ async function onSubmit(payload: { title: string; body: string }) {
     <AppHeader />
 
     <main class="mx-auto max-w-[40rem] px-3 pb-10 sm:px-4 sm:pb-12">
-      <h1 class="mb-4 text-xl font-normal sm:mb-5 sm:text-2xl">
-        {{ privateMode.active ? 'New note' : 'New post' }}
-      </h1>
+      <h1 class="mb-4 text-xl font-normal sm:mb-5 sm:text-2xl">New post</h1>
       <PostForm
         :submit-label="privateMode.active ? 'Save note' : 'Publish'"
         :loading="loading"

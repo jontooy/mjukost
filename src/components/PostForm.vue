@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import CameraCapture from '@/components/CameraCapture.vue'
 import { uploadPostImage } from '@/lib/storage'
 import { useAuthStore } from '@/stores/auth'
 import { usePrivateModeStore } from '@/stores/privateMode'
@@ -24,6 +25,11 @@ const body = ref(props.body ?? '')
 const bodyEl = ref<HTMLTextAreaElement | null>(null)
 const uploading = ref(false)
 const uploadError = ref('')
+const showCamera = ref(false)
+
+const cameraSupported = computed(
+  () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia,
+)
 
 watch(
   () => [props.title, props.body] as const,
@@ -60,13 +66,7 @@ function insertAtCursor(snippet: string) {
   })
 }
 
-async function onImageSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-
-  if (!file) return
-
+async function uploadImageFile(file: File) {
   const userId = auth.user?.id
   if (!userId) {
     uploadError.value = 'You must be signed in to upload images'
@@ -85,6 +85,25 @@ async function onImageSelected(event: Event) {
   } finally {
     uploading.value = false
   }
+}
+
+async function onImageSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+
+  if (!file) return
+  await uploadImageFile(file)
+}
+
+function openCamera() {
+  uploadError.value = ''
+  showCamera.value = true
+}
+
+async function onCameraCapture(file: File) {
+  showCamera.value = false
+  await uploadImageFile(file)
 }
 
 function onSubmit() {
@@ -122,20 +141,37 @@ function onSubmit() {
     </label>
 
     <div class="grid gap-[0.35rem]">
-      <label
-        class="inline-flex min-h-11 cursor-pointer items-center justify-self-stretch rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.45rem] text-[0.9rem] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 sm:justify-self-start"
-      >
-        {{ uploading ? 'Uploading…' : 'Add image' }}
-        <input
-          class="sr-only"
-          type="file"
-          accept="image/*"
+      <div class="flex flex-wrap gap-2 sm:gap-3">
+        <label
+          class="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.45rem] text-[0.9rem] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 sm:flex-none sm:justify-start"
+        >
+          {{ uploading ? 'Uploading…' : 'Add image' }}
+          <input
+            class="sr-only"
+            type="file"
+            accept="image/*"
+            :disabled="busy"
+            @change="onImageSelected"
+          />
+        </label>
+        <button
+          v-if="cameraSupported"
+          type="button"
+          class="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.45rem] text-[0.9rem] font-inherit text-ink disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
           :disabled="busy"
-          @change="onImageSelected"
-        />
-      </label>
+          @click="openCamera"
+        >
+          Take photo
+        </button>
+      </div>
       <p v-if="uploadError" class="m-0 text-[0.9rem] text-danger" role="alert">{{ uploadError }}</p>
     </div>
+
+    <CameraCapture
+      v-if="showCamera"
+      @capture="onCameraCapture"
+      @cancel="showCamera = false"
+    />
 
     <p v-if="errorMessage" class="m-0 text-[0.9rem] text-danger" role="alert">{{ errorMessage }}</p>
 

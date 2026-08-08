@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePrivateModeStore } from '@/stores/privateMode'
@@ -14,38 +13,40 @@ async function onSignOut() {
   await auth.signOut()
   await router.push({ name: 'home' })
 }
-
-function onKeydown(event: KeyboardEvent) {
-  if (!auth.isAuthenticated) return
-  if (route.name !== 'home') return
-  if (event.key !== 'p' && event.key !== 'P') return
-  if (event.metaKey || event.ctrlKey || event.altKey) return
-
-  const target = event.target as HTMLElement | null
-  const tag = target?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
-    return
-  }
-
-  event.preventDefault()
-  privateMode.toggle()
-}
-
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <header
     class="mx-auto flex max-w-[40rem] items-center justify-between gap-3 px-3 py-4 sm:gap-4 sm:px-4 sm:py-5"
   >
-    <RouterLink
-      class="inline-block text-xl font-bold text-inherit no-underline transition-transform duration-500 ease-in-out"
-      :class="privateMode.active ? 'rotate-180' : 'rotate-0'"
-      :to="{ name: 'home' }"
-    >
-      mjukost
-    </RouterLink>
+    <div class="flex items-center gap-3">
+      <RouterLink
+        class="inline-block text-xl font-bold text-inherit no-underline transition-transform duration-500 ease-in-out"
+        :class="privateMode.active ? 'rotate-180' : 'rotate-0'"
+        :to="{ name: 'home' }"
+      >
+        mjukost
+      </RouterLink>
+
+      <button
+        v-if="auth.isAuthenticated"
+        type="button"
+        role="switch"
+        class="inline-flex min-h-11 items-center sm:min-h-0"
+        :aria-checked="privateMode.active"
+        :aria-label="privateMode.active ? 'Switch to public posts' : 'Switch to private notes'"
+        @click="privateMode.toggle()"
+      >
+        <span
+          class="relative block h-6 w-11 shrink-0 rounded-full bg-ink p-0.5 transition-colors duration-200"
+        >
+          <span
+            class="block size-5 rounded-full bg-page transition-transform duration-200 ease-in-out"
+            :class="privateMode.active ? 'translate-x-5' : 'translate-x-0'"
+          />
+        </span>
+      </button>
+    </div>
 
     <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
       <template v-if="auth.isAuthenticated">
