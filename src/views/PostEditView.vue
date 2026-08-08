@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import PostForm from '@/components/PostForm.vue'
 import { getPost, updatePost } from '@/lib/posts'
+import { usePrivateModeStore } from '@/stores/privateMode'
 import type { Post } from '@/types/post'
 
 const route = useRoute()
 const router = useRouter()
+const privateMode = usePrivateModeStore()
 
 const post = ref<Post | null>(null)
 const loadingPost = ref(true)
@@ -20,10 +22,19 @@ async function loadPost() {
 
   try {
     const id = String(route.params.id)
-    post.value = await getPost(id)
-    if (!post.value) {
+    const next = await getPost(id)
+    if (!next) {
       errorMessage.value = 'Post not found'
+      post.value = null
+      return
     }
+
+    if (next.is_private !== privateMode.active) {
+      await router.replace({ name: 'home' })
+      return
+    }
+
+    post.value = next
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to load post'
   } finally {
@@ -41,6 +52,7 @@ async function onSubmit(payload: { title: string; body: string }) {
     await updatePost(post.value.id, {
       title: payload.title,
       body: payload.body,
+      is_private: post.value.is_private,
     })
     await router.push({ name: 'home' })
   } catch (error) {
@@ -58,7 +70,9 @@ onMounted(loadPost)
     <AppHeader />
 
     <main class="mx-auto max-w-[40rem] px-4 pb-12">
-      <h1 class="mb-5 text-2xl font-normal">Edit post</h1>
+      <h1 class="mb-5 text-2xl font-normal">
+        {{ privateMode.active ? 'Edit note' : 'Edit post' }}
+      </h1>
 
       <p v-if="loadingPost" class="text-muted">Loading…</p>
       <p v-else-if="!post" class="text-danger" role="alert">

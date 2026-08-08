@@ -9,12 +9,24 @@
   --color-danger: #b00020;
   --color-border: #ccc;
   --color-code-bg: #eee;
+  --color-surface: #ffffff;
   --radius-sm: 0.35rem;
 }
 
 @layer base {
+  :root.private-mode {
+    --color-ink: #e8e6e3;
+    --color-page: #121212;
+    --color-muted: #9a9690;
+    --color-subtle: #8a8680;
+    --color-danger: #ff7a86;
+    --color-border: #3a3a3a;
+    --color-code-bg: #1e1e1e;
+    --color-surface: #1c1c1c;
+  }
+
   body {
-    @apply m-0 bg-page font-sans leading-normal text-ink;
+    @apply m-0 bg-page font-sans leading-normal text-ink transition-colors duration-200;
   }
 }
 

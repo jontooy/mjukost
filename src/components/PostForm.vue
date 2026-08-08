@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { uploadPostImage } from '@/lib/storage'
 import { useAuthStore } from '@/stores/auth'
+import { usePrivateModeStore } from '@/stores/privateMode'
 
 const props = defineProps<{
   title?: string
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const auth = useAuthStore()
+const privateMode = usePrivateModeStore()
 
 const title = ref(props.title ?? '')
 const body = ref(props.body ?? '')
@@ -75,7 +77,7 @@ async function onImageSelected(event: Event) {
   uploadError.value = ''
 
   try {
-    const url = await uploadPostImage(file, userId)
+    const url = await uploadPostImage(file, userId, { isPrivate: privateMode.active })
     const alt = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
     insertAtCursor(`![${alt}](${url})`)
   } catch (error) {
@@ -99,7 +101,7 @@ function onSubmit() {
       Title
       <input
         v-model="title"
-        class="rounded-[0.35rem] border border-border px-[0.7rem] py-[0.6rem] font-inherit disabled:cursor-not-allowed disabled:opacity-60"
+        class="rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] font-inherit text-ink disabled:cursor-not-allowed disabled:opacity-60"
         type="text"
         required
         maxlength="200"
@@ -112,7 +114,7 @@ function onSubmit() {
       <textarea
         ref="bodyEl"
         v-model="body"
-        class="resize-y rounded-[0.35rem] border border-border px-[0.7rem] py-[0.6rem] font-mono leading-[1.45] disabled:cursor-not-allowed disabled:opacity-60"
+        class="resize-y rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.6rem] font-mono leading-[1.45] text-ink disabled:cursor-not-allowed disabled:opacity-60"
         rows="14"
         required
         :disabled="busy"
@@ -121,7 +123,7 @@ function onSubmit() {
 
     <div class="grid gap-[0.35rem]">
       <label
-        class="inline-flex cursor-pointer items-center justify-self-start rounded-[0.35rem] border border-border bg-white px-[0.7rem] py-[0.45rem] text-[0.9rem] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+        class="inline-flex cursor-pointer items-center justify-self-start rounded-[0.35rem] border border-border bg-surface px-[0.7rem] py-[0.45rem] text-[0.9rem] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
       >
         {{ uploading ? 'Uploading…' : 'Add image' }}
         <input
@@ -139,7 +141,7 @@ function onSubmit() {
 
     <button
       type="submit"
-      class="justify-self-start cursor-pointer rounded-[0.35rem] border-0 bg-ink px-[0.9rem] py-[0.65rem] font-inherit text-white disabled:cursor-not-allowed disabled:opacity-60"
+      class="justify-self-start cursor-pointer rounded-[0.35rem] border-0 bg-ink px-[0.9rem] py-[0.65rem] font-inherit text-page disabled:cursor-not-allowed disabled:opacity-60"
       :disabled="busy"
     >
       {{ props.loading ? 'Saving…' : label }}

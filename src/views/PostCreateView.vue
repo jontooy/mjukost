@@ -5,8 +5,10 @@ import AppHeader from '@/components/AppHeader.vue'
 import PostForm from '@/components/PostForm.vue'
 import { createPost } from '@/lib/posts'
 import { useAuthStore } from '@/stores/auth'
+import { usePrivateModeStore } from '@/stores/privateMode'
 
 const auth = useAuthStore()
+const privateMode = usePrivateModeStore()
 const router = useRouter()
 
 const loading = ref(false)
@@ -26,6 +28,7 @@ async function onSubmit(payload: { title: string; body: string }) {
     await createPost({
       title: payload.title,
       body: payload.body,
+      is_private: privateMode.active,
       user_id: userId,
     })
     await router.push({ name: 'home' })
@@ -42,9 +45,11 @@ async function onSubmit(payload: { title: string; body: string }) {
     <AppHeader />
 
     <main class="mx-auto max-w-[40rem] px-4 pb-12">
-      <h1 class="mb-5 text-2xl font-normal">New post</h1>
+      <h1 class="mb-5 text-2xl font-normal">
+        {{ privateMode.active ? 'New note' : 'New post' }}
+      </h1>
       <PostForm
-        submit-label="Publish"
+        :submit-label="privateMode.active ? 'Save note' : 'Publish'"
         :loading="loading"
         :error-message="errorMessage"
         @submit="onSubmit"

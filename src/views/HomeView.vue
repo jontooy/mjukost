@@ -1,20 +1,25 @@
 <script setup lang="ts">
 import { marked } from 'marked'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
 import { deletePost, listPosts } from '@/lib/posts'
+import { resolvePrivateMarkdownUrls } from '@/lib/storage'
 import { useAuthStore } from '@/stores/auth'
+import { usePrivateModeStore } from '@/stores/privateMode'
 import type { Post } from '@/types/post'
 
 const auth = useAuthStore()
+const privateMode = usePrivateModeStore()
 
 const posts = ref<Post[]>([])
+const renderedBodies = ref<Record<string, string>>({})
 const loading = ref(true)
 const errorMessage = ref('')
 const deletingId = ref<string | null>(null)
 
-function renderMarkdown(body: string) {
-  return marked.parse(body, { async: false }) as string
+async function renderMarkdown(body: string) {
+  const resolved = await resolvePrivateMarkdownUrls(body)
+  return marked.parse(resolved, { async: false }) as string
 }
 
 function formatDate(value: string) {
@@ -30,7 +35,12 @@ async function loadPosts() {
   errorMessage.value = ''
 
   try {
-    posts.value = await listPosts()
+    const nextPosts = await listPosts({ isPrivate: privateMode.active })
+    const bodies = await Promise.all(
+      nextPosts.map(async (post) => [post.id, await renderMarkdown(post.body)] as const),
+    )
+    posts.value = nextPosts
+    renderedBodies.value = Object.fromEntries(bodies)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to load posts'
   } finally {
@@ -47,12 +57,20 @@ async function onDelete(post: Post) {
   try {
     await deletePost(post.id)
     posts.value = posts.value.filter((item) => item.id !== post.id)
+    delete renderedBodies.value[post.id]
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to delete post'
   } finally {
     deletingId.value = null
   }
 }
+
+watch(
+  () => privateMode.active,
+  () => {
+    void loadPosts()
+  },
+)
 
 onMounted(loadPosts)
 </script>
@@ -69,11 +87,13 @@ onMounted(loadPosts)
         role="status"
       >
         <div
-          class="h-7 w-7 animate-spin rounded-full border-2 border-[#bbb] border-t-[#666]"
+          class="h-7 w-7 animate-spin rounded-full border-2 border-border border-t-muted"
         />
       </div>
       <p v-else-if="errorMessage" class="text-danger" role="alert">{{ errorMessage }}</p>
-      <p v-else-if="posts.length === 0" class="text-muted">No posts yet.</p>
+      <p v-else-if="posts.length === 0" class="text-muted">
+        {{ privateMode.active ? 'No private notes yet.' : 'No posts yet.' }}
+      </p>
 
       <section v-else class="grid gap-8">
         <article v-for="post in posts" :key="post.id">
@@ -94,7 +114,7 @@ onMounted(loadPosts)
               </RouterLink>
               <button
                 type="button"
-                class="cursor-pointer rounded-[0.35rem] border border-border bg-white px-[0.55rem] py-[0.3rem] text-[0.85rem] font-inherit disabled:cursor-not-allowed disabled:opacity-60"
+                class="cursor-pointer rounded-[0.35rem] border border-border bg-surface px-[0.55rem] py-[0.3rem] text-[0.85rem] font-inherit text-ink disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="deletingId === post.id"
                 @click="onDelete(post)"
               >
@@ -103,7 +123,7 @@ onMounted(loadPosts)
             </div>
           </header>
 
-          <div class="post-body" v-html="renderMarkdown(post.body)" />
+          <div class="post-body" v-html="renderedBodies[post.id]" />
         </article>
       </section>
     </main>

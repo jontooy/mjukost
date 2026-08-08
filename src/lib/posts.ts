@@ -1,11 +1,17 @@
 import { supabase } from '@/lib/supabase'
-import type { Post, PostInput, PostUpdate } from '@/types/post'
+import { POST_COLUMNS, type Post, type PostInput, type PostUpdate } from '@/types/post'
 
-export async function listPosts(): Promise<Post[]> {
-  const { data, error } = await supabase
+export async function listPosts(options?: { isPrivate: boolean }): Promise<Post[]> {
+  let query = supabase
     .from('posts')
-    .select('id, user_id, title, body, created_at, updated_at')
+    .select(POST_COLUMNS)
     .order('created_at', { ascending: false })
+
+  if (options) {
+    query = query.eq('is_private', options.isPrivate)
+  }
+
+  const { data, error } = await query
 
   if (error) throw error
   return data ?? []
@@ -14,7 +20,7 @@ export async function listPosts(): Promise<Post[]> {
 export async function getPost(id: string): Promise<Post | null> {
   const { data, error } = await supabase
     .from('posts')
-    .select('id, user_id, title, body, created_at, updated_at')
+    .select(POST_COLUMNS)
     .eq('id', id)
     .maybeSingle()
 
@@ -28,9 +34,10 @@ export async function createPost(input: PostInput): Promise<Post> {
     .insert({
       title: input.title,
       body: input.body,
+      is_private: input.is_private,
       user_id: input.user_id,
     })
-    .select('id, user_id, title, body, created_at, updated_at')
+    .select(POST_COLUMNS)
     .single()
 
   if (error) throw error
@@ -43,10 +50,11 @@ export async function updatePost(id: string, input: PostUpdate): Promise<Post> {
     .update({
       title: input.title,
       body: input.body,
+      is_private: input.is_private,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
-    .select('id, user_id, title, body, created_at, updated_at')
+    .select(POST_COLUMNS)
     .single()
 
   if (error) throw error
