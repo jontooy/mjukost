@@ -1,0 +1,89 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --color-ink: #1a1a1a;
+  --color-page: #f7f7f5;
+  --color-muted: #555;
+  --color-subtle: #666;
+  --color-danger: #b00020;
+  --color-border: #ccc;
+  --color-code-bg: #eee;
+  --radius-sm: 0.35rem;
+}
+
+@layer base {
+  body {
+    @apply m-0 bg-page font-sans leading-normal text-ink;
+  }
+}
+
+@layer components {
+  .post-body {
+    h1 {
+      @apply mb-3 mt-6 text-[1.75rem] font-bold leading-tight first:mt-0;
+    }
+
+    h2 {
+      @apply mb-2.5 mt-5 text-[1.4rem] font-bold leading-tight first:mt-0;
+    }
+
+    h3 {
+      @apply mb-2 mt-4 text-[1.2rem] font-semibold leading-snug first:mt-0;
+    }
+
+    h4,
+    h5,
+    h6 {
+      @apply mb-2 mt-4 text-base font-semibold first:mt-0;
+    }
+
+    p {
+      @apply mb-[0.85rem];
+    }
+
+    p:last-child {
+      @apply mb-0;
+    }
+
+    ul {
+      @apply mb-[0.85rem] list-disc pl-6;
+    }
+
+    ol {
+      @apply mb-[0.85rem] list-decimal pl-6;
+    }
+
+    li {
+      @apply mb-1;
+    }
+
+    blockquote {
+      @apply mb-[0.85rem] border-l-4 border-border pl-4 text-muted;
+    }
+
+    a {
+      @apply underline;
+    }
+
+    hr {
+      @apply my-6 border-border;
+    }
+
+    pre {
+      @apply mb-[0.85rem] overflow-x-auto rounded-[0.35rem] bg-code-bg p-3;
+    }
+
+    code {
+      @apply font-mono text-[0.9em];
+    }
+
+    pre code {
+      @apply text-[0.9em];
+    }
+
+    img {
+      @apply my-[0.85rem] block h-auto max-w-full rounded-[0.35rem];
+    }
+  }
+}

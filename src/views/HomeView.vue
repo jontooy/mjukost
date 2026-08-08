@@ -58,29 +58,43 @@ onMounted(loadPosts)
 </script>
 
 <template>
-  <div class="page">
+  <div class="min-h-screen">
     <AppHeader />
 
-    <main class="main">
-      <p v-if="loading" class="status">Loading posts…</p>
-      <p v-else-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
-      <p v-else-if="posts.length === 0" class="status">No posts yet.</p>
+    <main class="mx-auto max-w-[40rem] px-4 pb-12">
+      <div
+        v-if="loading"
+        class="grid min-h-[calc(100vh-6rem)] place-items-center opacity-45"
+        aria-label="Loading posts"
+        role="status"
+      >
+        <div
+          class="h-7 w-7 animate-spin rounded-full border-2 border-[#bbb] border-t-[#666]"
+        />
+      </div>
+      <p v-else-if="errorMessage" class="text-danger" role="alert">{{ errorMessage }}</p>
+      <p v-else-if="posts.length === 0" class="text-muted">No posts yet.</p>
 
-      <section v-else class="posts">
-        <article v-for="post in posts" :key="post.id" class="post">
-          <header class="post-header">
+      <section v-else class="grid gap-8">
+        <article v-for="post in posts" :key="post.id">
+          <header class="mb-3 flex items-start justify-between gap-4">
             <div>
-              <h2>{{ post.title }}</h2>
-              <time :datetime="post.created_at">{{ formatDate(post.created_at) }}</time>
+              <h2 class="m-0 text-[1.4rem]">{{ post.title }}</h2>
+              <time class="text-[0.85rem] text-subtle" :datetime="post.created_at">
+                {{ formatDate(post.created_at) }}
+              </time>
             </div>
 
-            <div v-if="auth.isAuthenticated" class="post-actions">
-              <RouterLink class="link" :to="{ name: 'post-edit', params: { id: post.id } }">
+            <div v-if="auth.isAuthenticated" class="flex shrink-0 items-center gap-[0.65rem]">
+              <RouterLink
+                class="text-[0.9rem] text-inherit"
+                :to="{ name: 'post-edit', params: { id: post.id } }"
+              >
                 Edit
               </RouterLink>
               <button
                 type="button"
-                class="button"
+                class="cursor-pointer rounded-[0.35rem] border border-border bg-white px-[0.55rem] py-[0.3rem] text-[0.85rem] font-inherit disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="deletingId === post.id"
                 @click="onDelete(post)"
               >
@@ -89,107 +103,9 @@ onMounted(loadPosts)
             </div>
           </header>
 
-          <div class="body" v-html="renderMarkdown(post.body)" />
+          <div class="post-body" v-html="renderMarkdown(post.body)" />
         </article>
       </section>
     </main>
   </div>
 </template>
-
-<style scoped>
-.page {
-  min-height: 100vh;
-}
-
-.main {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 0 1rem 3rem;
-}
-
-.status {
-  color: #555;
-}
-
-.error {
-  color: #b00020;
-}
-
-.posts {
-  display: grid;
-  gap: 2rem;
-}
-
-.post-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-
-h2 {
-  margin: 0;
-  font-size: 1.4rem;
-}
-
-time {
-  color: #666;
-  font-size: 0.85rem;
-}
-
-.post-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  flex-shrink: 0;
-}
-
-.link {
-  color: inherit;
-  font-size: 0.9rem;
-}
-
-.button {
-  padding: 0.3rem 0.55rem;
-  border: 1px solid #ccc;
-  border-radius: 0.35rem;
-  background: #fff;
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.body :deep(p) {
-  margin: 0 0 0.85rem;
-}
-
-.body :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.body :deep(pre) {
-  overflow-x: auto;
-  padding: 0.75rem;
-  border-radius: 0.35rem;
-  background: #eee;
-}
-
-.body :deep(code) {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.9em;
-}
-
-.body :deep(img) {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: 0.85rem 0;
-  border-radius: 0.35rem;
-}
-</style>

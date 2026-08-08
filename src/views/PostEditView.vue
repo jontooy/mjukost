@@ -54,14 +54,16 @@ onMounted(loadPost)
 </script>
 
 <template>
-  <div class="page">
+  <div class="min-h-screen">
     <AppHeader />
 
-    <main class="main">
-      <h1>Edit post</h1>
+    <main class="mx-auto max-w-[40rem] px-4 pb-12">
+      <h1 class="mb-5 text-2xl font-normal">Edit post</h1>
 
-      <p v-if="loadingPost" class="status">Loading…</p>
-      <p v-else-if="!post" class="error" role="alert">{{ errorMessage || 'Post not found' }}</p>
+      <p v-if="loadingPost" class="text-muted">Loading…</p>
+      <p v-else-if="!post" class="text-danger" role="alert">
+        {{ errorMessage || 'Post not found' }}
+      </p>
 
       <PostForm
         v-else
@@ -75,28 +77,3 @@ onMounted(loadPost)
     </main>
   </div>
 </template>
-
-<style scoped>
-.page {
-  min-height: 100vh;
-}
-
-.main {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 0 1rem 3rem;
-}
-
-h1 {
-  margin: 0 0 1.25rem;
-  font-size: 1.5rem;
-}
-
-.status {
-  color: #555;
-}
-
-.error {
-  color: #b00020;
-}
-</style>

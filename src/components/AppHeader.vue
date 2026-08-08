@@ -12,63 +12,27 @@ async function onSignOut() {
 </script>
 
 <template>
-  <header class="header">
-    <RouterLink class="brand" :to="{ name: 'home' }">Mjukost</RouterLink>
+  <header class="mx-auto flex max-w-[40rem] items-center justify-between gap-4 px-4 py-5">
+    <RouterLink class="text-xl font-bold text-inherit no-underline" :to="{ name: 'home' }">
+      mjukost
+    </RouterLink>
 
-    <div class="actions">
+    <div class="flex flex-wrap items-center justify-end gap-3">
       <template v-if="auth.isAuthenticated">
-        <span class="email">{{ auth.user?.email }}</span>
-        <RouterLink class="link" :to="{ name: 'post-create' }">New post</RouterLink>
-        <button type="button" class="button" @click="onSignOut">Sign out</button>
+        <RouterLink class="text-[0.9rem] text-inherit" :to="{ name: 'post-create' }">
+          New post
+        </RouterLink>
+        <button
+          type="button"
+          class="cursor-pointer rounded-[0.35rem] border border-border bg-white px-[0.65rem] py-[0.35rem] text-[0.9rem] font-inherit"
+          @click="onSignOut"
+        >
+          Sign out
+        </button>
       </template>
-      <RouterLink v-else class="link" :to="{ name: 'login' }">Sign in</RouterLink>
+      <RouterLink v-else class="text-[0.9rem] text-inherit" :to="{ name: 'login' }">
+        Sign in
+      </RouterLink>
     </div>
   </header>
 </template>
-
-<style scoped>
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 1.25rem 1rem;
-}
-
-.brand {
-  color: inherit;
-  font-size: 1.25rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.email {
-  color: #555;
-  font-size: 0.85rem;
-}
-
-.link {
-  color: inherit;
-  font-size: 0.9rem;
-}
-
-.button {
-  padding: 0.35rem 0.65rem;
-  border: 1px solid #ccc;
-  border-radius: 0.35rem;
-  background: #fff;
-  font: inherit;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-</style>

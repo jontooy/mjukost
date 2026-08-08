@@ -29,95 +29,46 @@ async function onSubmit() {
 </script>
 
 <template>
-  <main class="login">
-    <p class="back">
-      <RouterLink :to="{ name: 'home' }">← Back</RouterLink>
+  <main class="mx-auto mt-16 max-w-[22rem] px-4">
+    <p class="mb-4">
+      <RouterLink class="text-[0.9rem] text-muted" :to="{ name: 'home' }">← Back</RouterLink>
     </p>
-    <h1>Sign in</h1>
-    <p class="hint">Use your email and password.</p>
+    <h1 class="mb-2 text-[1.75rem] font-normal">Sign in</h1>
 
-    <form class="form" @submit.prevent="onSubmit">
-      <label>
+    <form class="grid gap-4" @submit.prevent="onSubmit">
+      <label class="grid gap-[0.35rem] text-[0.9rem]">
         Email
-        <input v-model="email" type="email" autocomplete="username" required />
+        <input
+          v-model="email"
+          class="rounded-[0.35rem] border border-border px-[0.7rem] py-[0.6rem] font-inherit"
+          type="email"
+          autocomplete="username"
+          required
+        />
       </label>
 
-      <label>
+      <label class="grid gap-[0.35rem] text-[0.9rem]">
         Password
-        <input v-model="password" type="password" autocomplete="current-password" required />
+        <input
+          v-model="password"
+          class="rounded-[0.35rem] border border-border px-[0.7rem] py-[0.6rem] font-inherit"
+          type="password"
+          autocomplete="current-password"
+          required
+        />
       </label>
 
-      <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
+      <p v-if="errorMessage" class="m-0 text-[0.9rem] text-danger" role="alert">
+        {{ errorMessage }}
+      </p>
 
-      <button type="submit" :disabled="loading">
+      <button
+        type="submit"
+        class="cursor-pointer rounded-[0.35rem] border-0 bg-ink px-[0.9rem] py-[0.65rem] font-inherit text-white disabled:cursor-not-allowed disabled:opacity-60"
+        :disabled="loading"
+      >
         {{ loading ? 'Signing in…' : 'Sign in' }}
       </button>
     </form>
   </main>
 </template>
-
-<style scoped>
-.login {
-  max-width: 22rem;
-  margin: 4rem auto;
-  padding: 0 1rem;
-}
-
-.back {
-  margin: 0 0 1rem;
-}
-
-.back a {
-  color: #555;
-  font-size: 0.9rem;
-}
-
-h1 {
-  margin: 0 0 0.5rem;
-  font-size: 1.75rem;
-}
-
-.hint {
-  margin: 0 0 1.5rem;
-  color: #555;
-}
-
-.form {
-  display: grid;
-  gap: 1rem;
-}
-
-label {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.9rem;
-}
-
-input {
-  padding: 0.6rem 0.7rem;
-  border: 1px solid #ccc;
-  border-radius: 0.35rem;
-  font: inherit;
-}
-
-button {
-  padding: 0.65rem 0.9rem;
-  border: none;
-  border-radius: 0.35rem;
-  background: #1a1a1a;
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error {
-  margin: 0;
-  color: #b00020;
-  font-size: 0.9rem;
-}
-</style>

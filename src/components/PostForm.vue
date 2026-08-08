@@ -94,116 +94,55 @@ function onSubmit() {
 </script>
 
 <template>
-  <form class="form" @submit.prevent="onSubmit">
-    <label>
+  <form class="grid gap-4" @submit.prevent="onSubmit">
+    <label class="grid gap-[0.35rem] text-[0.9rem]">
       Title
-      <input v-model="title" type="text" required maxlength="200" :disabled="busy" />
+      <input
+        v-model="title"
+        class="rounded-[0.35rem] border border-border px-[0.7rem] py-[0.6rem] font-inherit disabled:cursor-not-allowed disabled:opacity-60"
+        type="text"
+        required
+        maxlength="200"
+        :disabled="busy"
+      />
     </label>
 
-    <label>
+    <label class="grid gap-[0.35rem] text-[0.9rem]">
       Body (markdown)
-      <textarea ref="bodyEl" v-model="body" rows="14" required :disabled="busy" />
+      <textarea
+        ref="bodyEl"
+        v-model="body"
+        class="resize-y rounded-[0.35rem] border border-border px-[0.7rem] py-[0.6rem] font-mono leading-[1.45] disabled:cursor-not-allowed disabled:opacity-60"
+        rows="14"
+        required
+        :disabled="busy"
+      />
     </label>
 
-    <div class="image-row">
-      <label class="file-label">
+    <div class="grid gap-[0.35rem]">
+      <label
+        class="inline-flex cursor-pointer items-center justify-self-start rounded-[0.35rem] border border-border bg-white px-[0.7rem] py-[0.45rem] text-[0.9rem] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+      >
         {{ uploading ? 'Uploading…' : 'Add image' }}
         <input
+          class="sr-only"
           type="file"
           accept="image/*"
           :disabled="busy"
           @change="onImageSelected"
         />
       </label>
-      <p v-if="uploadError" class="error" role="alert">{{ uploadError }}</p>
+      <p v-if="uploadError" class="m-0 text-[0.9rem] text-danger" role="alert">{{ uploadError }}</p>
     </div>
 
-    <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="m-0 text-[0.9rem] text-danger" role="alert">{{ errorMessage }}</p>
 
-    <button type="submit" :disabled="busy">
+    <button
+      type="submit"
+      class="justify-self-start cursor-pointer rounded-[0.35rem] border-0 bg-ink px-[0.9rem] py-[0.65rem] font-inherit text-white disabled:cursor-not-allowed disabled:opacity-60"
+      :disabled="busy"
+    >
       {{ props.loading ? 'Saving…' : label }}
     </button>
   </form>
 </template>
-
-<style scoped>
-.form {
-  display: grid;
-  gap: 1rem;
-}
-
-label {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.9rem;
-}
-
-input,
-textarea {
-  padding: 0.6rem 0.7rem;
-  border: 1px solid #ccc;
-  border-radius: 0.35rem;
-  font: inherit;
-}
-
-textarea {
-  resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  line-height: 1.45;
-}
-
-.image-row {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.file-label {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  padding: 0.45rem 0.7rem;
-  border: 1px solid #ccc;
-  border-radius: 0.35rem;
-  background: #fff;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.file-label:has(input:disabled) {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.file-label input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
-}
-
-button {
-  justify-self: start;
-  padding: 0.65rem 0.9rem;
-  border: none;
-  border-radius: 0.35rem;
-  background: #1a1a1a;
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error {
-  margin: 0;
-  color: #b00020;
-  font-size: 0.9rem;
-}
-</style>

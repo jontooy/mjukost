@@ -38,11 +38,11 @@ async function onSubmit(payload: { title: string; body: string }) {
 </script>
 
 <template>
-  <div class="page">
+  <div class="min-h-screen">
     <AppHeader />
 
-    <main class="main">
-      <h1>New post</h1>
+    <main class="mx-auto max-w-[40rem] px-4 pb-12">
+      <h1 class="mb-5 text-2xl font-normal">New post</h1>
       <PostForm
         submit-label="Publish"
         :loading="loading"
@@ -52,20 +52,3 @@ async function onSubmit(payload: { title: string; body: string }) {
     </main>
   </div>
 </template>
-
-<style scoped>
-.page {
-  min-height: 100vh;
-}
-
-.main {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 0 1rem 3rem;
-}
-
-h1 {
-  margin: 0 0 1.25rem;
-  font-size: 1.5rem;
-}
-</style>
