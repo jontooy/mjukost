@@ -56,6 +56,13 @@ async function onSignOut() {
         >
           {{ privateMode.active ? 'New note' : 'New post' }}
         </RouterLink>
+        <RouterLink
+          v-if="route.name !== 'update-password'"
+          class="inline-flex min-h-11 items-center text-[0.9rem] text-inherit sm:min-h-0"
+          :to="{ name: 'update-password' }"
+        >
+          Password
+        </RouterLink>
         <button
           type="button"
           class="min-h-11 cursor-pointer rounded-[0.35rem] border border-border bg-surface px-[0.65rem] py-[0.35rem] text-[0.9rem] font-inherit text-ink sm:min-h-0"
