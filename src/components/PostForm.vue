@@ -3,9 +3,9 @@ import { computed, ref, watch } from 'vue'
 import CameraCapture from '@/components/CameraCapture.vue'
 import { uploadPostImage } from '@/lib/storage'
 import { useAuthStore } from '@/stores/auth'
-import { usePrivateModeStore } from '@/stores/privateMode'
 
 const props = defineProps<{
+  isPrivate: boolean
   title?: string
   body?: string
   submitLabel?: string
@@ -18,7 +18,6 @@ const emit = defineEmits<{
 }>()
 
 const auth = useAuthStore()
-const privateMode = usePrivateModeStore()
 
 const title = ref(props.title ?? '')
 const body = ref(props.body ?? '')
@@ -77,7 +76,7 @@ async function uploadImageFile(file: File) {
   uploadError.value = ''
 
   try {
-    const url = await uploadPostImage(file, userId, { isPrivate: privateMode.active })
+    const url = await uploadPostImage(file, userId, { isPrivate: props.isPrivate })
     const alt = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
     insertAtCursor(`![${alt}](${url})`)
   } catch (error) {
@@ -167,11 +166,7 @@ function onSubmit() {
       <p v-if="uploadError" class="m-0 text-[0.9rem] text-danger" role="alert">{{ uploadError }}</p>
     </div>
 
-    <CameraCapture
-      v-if="showCamera"
-      @capture="onCameraCapture"
-      @cancel="showCamera = false"
-    />
+    <CameraCapture v-if="showCamera" @capture="onCameraCapture" @cancel="showCamera = false" />
 
     <p v-if="errorMessage" class="m-0 text-[0.9rem] text-danger" role="alert">{{ errorMessage }}</p>
 
