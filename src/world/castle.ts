@@ -1,13 +1,7 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
-import {
-  createDesk,
-  createPainting,
-  createPortalSurface,
-  disposeScene,
-  seededRandom,
-} from '@/world/props'
+import { createDesk, createPainting, disposeObject, seededRandom } from '@/world/props'
 
 const HALF_WIDTH = 5
 const HEIGHT = 7
@@ -105,9 +99,14 @@ export function createCastle(notes: Post[]): World {
     action: { kind: 'new', isPrivate: true },
   })
 
-  const portal = createPortalSurface('#ffb070', 2.2, 3.2)
-  portal.mesh.position.set(0, 1.8, -0.05)
-  scene.add(portal.mesh)
+  const doorway = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, 3.6),
+    new THREE.MeshBasicMaterial({ color: '#f4f0dc' }),
+  )
+  doorway.position.set(0, 1.8, -0.01)
+  const daylight = new THREE.PointLight('#f4f0dc', 4, 8)
+  daylight.position.set(0, 2.5, -1)
+  scene.add(doorway, daylight)
 
   return {
     name: 'castle',
@@ -121,11 +120,10 @@ export function createCastle(notes: Post[]): World {
       position.z = THREE.MathUtils.clamp(position.z, -length + 1, -0.3)
     },
     update(_dt, elapsed) {
-      portal.tick(elapsed)
       torches.forEach((torch, index) => {
         torch.intensity = 5 + Math.sin(elapsed * 9 + index * 3.1) * 0.8 + random() * 0.6
       })
     },
-    dispose: () => disposeScene(scene),
+    dispose: () => disposeObject(scene),
   }
 }
