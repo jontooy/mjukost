@@ -1,10 +1,7 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
 
-export type WorldAction =
-  | { kind: 'read'; post: Post }
-  | { kind: 'new'; isPrivate: boolean }
-  | { kind: 'portal'; to: WorldName }
+export type WorldAction = { kind: 'read'; post: Post } | { kind: 'new'; isPrivate: boolean }
 
 export type WorldName = 'forest' | 'castle'
 

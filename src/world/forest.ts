@@ -80,7 +80,11 @@ export function createForest(posts: Post[], options: { canWrite: boolean }): Wor
     desk.position.set(2.2, 0, 4)
     desk.rotation.y = -Math.PI / 2
     scene.add(desk)
-    interactables.push({ object: desk, label: 'Write a public post', action: { kind: 'new', isPrivate: false } })
+    interactables.push({
+      object: desk,
+      label: 'Write a public post',
+      action: { kind: 'new', isPrivate: false },
+    })
   }
 
   const portal = createPortalSurface('#7fb8ff', 2.4, 3.4)
@@ -96,7 +100,9 @@ export function createForest(posts: Post[], options: { canWrite: boolean }): Wor
     spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, 8), yaw: 0 },
     arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, gateZ + 4), yaw: Math.PI } },
     interactables,
-    portals: [{ position: portal.mesh.position.clone().setY(EYE_HEIGHT), radius: 1.3, to: 'castle' }],
+    portals: [
+      { position: portal.mesh.position.clone().setY(EYE_HEIGHT), radius: 1.3, to: 'castle' },
+    ],
     clamp(position) {
       position.x = THREE.MathUtils.clamp(position.x, -13, 13)
       position.z = THREE.MathUtils.clamp(position.z, gateZ + 1, 10)
@@ -144,8 +150,16 @@ function addTrees(scene: THREE.Scene, random: () => number, gateZ: number) {
 
 function createCastleGate(gateZ: number) {
   const castle = new THREE.Group()
-  const stone = new THREE.MeshStandardMaterial({ color: '#7d7a70', roughness: 0.95, flatShading: true })
-  const roof = new THREE.MeshStandardMaterial({ color: '#3f3a4a', roughness: 0.8, flatShading: true })
+  const stone = new THREE.MeshStandardMaterial({
+    color: '#7d7a70',
+    roughness: 0.95,
+    flatShading: true,
+  })
+  const roof = new THREE.MeshStandardMaterial({
+    color: '#3f3a4a',
+    roughness: 0.8,
+    flatShading: true,
+  })
   const add = (mesh: THREE.Mesh, x: number, y: number, z: number) => {
     mesh.position.set(x, y, z)
     mesh.castShadow = mesh.receiveShadow = true
@@ -183,7 +197,13 @@ function createFireflies(random: () => number, gateZ: number) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(base, 3))
   const points = new THREE.Points(
     geometry,
-    new THREE.PointsMaterial({ color: '#fff3a0', size: 0.08, transparent: true, opacity: 0.85, fog: false }),
+    new THREE.PointsMaterial({
+      color: '#fff3a0',
+      size: 0.08,
+      transparent: true,
+      opacity: 0.85,
+      fog: false,
+    }),
   )
   const positions = geometry.attributes.position as THREE.BufferAttribute
   return {

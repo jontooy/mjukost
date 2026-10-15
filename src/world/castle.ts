@@ -22,7 +22,11 @@ export function createCastle(notes: Post[]): World {
 
   const length = Math.max(18, Math.ceil(notes.length / 2) * NOTE_SPACING + 10)
   const centerZ = -length / 2
-  const stone = new THREE.MeshStandardMaterial({ color: '#5d5850', roughness: 0.95, flatShading: true })
+  const stone = new THREE.MeshStandardMaterial({
+    color: '#5d5850',
+    roughness: 0.95,
+    flatShading: true,
+  })
   const random = seededRandom(11)
 
   const floor = new THREE.Mesh(
@@ -78,16 +82,28 @@ export function createCastle(notes: Post[]): World {
   notes.forEach((note, index) => {
     const side = index % 2 === 0 ? -1 : 1
     const painting = createPainting(note, '#b08a3e')
-    painting.position.set(side * (HALF_WIDTH - 0.05), 2, -4.2 - Math.floor(index / 2) * NOTE_SPACING)
+    painting.position.set(
+      side * (HALF_WIDTH - 0.05),
+      2,
+      -4.2 - Math.floor(index / 2) * NOTE_SPACING,
+    )
     painting.rotation.y = (-side * Math.PI) / 2
     scene.add(painting)
-    interactables.push({ object: painting, label: note.title, action: { kind: 'read', post: note } })
+    interactables.push({
+      object: painting,
+      label: note.title,
+      action: { kind: 'read', post: note },
+    })
   })
 
   const desk = createDesk('#3a2a1c')
   desk.position.set(0, 0, -length + 2)
   scene.add(desk)
-  interactables.push({ object: desk, label: 'Write a private note', action: { kind: 'new', isPrivate: true } })
+  interactables.push({
+    object: desk,
+    label: 'Write a private note',
+    action: { kind: 'new', isPrivate: true },
+  })
 
   const portal = createPortalSurface('#ffb070', 2.2, 3.2)
   portal.mesh.position.set(0, 1.8, -0.05)

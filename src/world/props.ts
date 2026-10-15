@@ -54,7 +54,11 @@ export function createDesk(woodColor: THREE.ColorRepresentation) {
   return group
 }
 
-export function createPortalSurface(color: THREE.ColorRepresentation, width: number, height: number) {
+export function createPortalSurface(
+  color: THREE.ColorRepresentation,
+  width: number,
+  height: number,
+) {
   const material = new THREE.ShaderMaterial({
     transparent: true,
     side: THREE.DoubleSide,

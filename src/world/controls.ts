@@ -166,7 +166,11 @@ export class FirstPersonControls {
         this.joystick.x = dx * scale
         this.joystick.y = dy * scale
       } else if (this.lookTouch && touch.identifier === this.lookTouch.id) {
-        this.look(touch.clientX - this.lookTouch.x, touch.clientY - this.lookTouch.y, TOUCH_SENSITIVITY)
+        this.look(
+          touch.clientX - this.lookTouch.x,
+          touch.clientY - this.lookTouch.y,
+          TOUCH_SENSITIVITY,
+        )
         this.lookTouch.x = touch.clientX
         this.lookTouch.y = touch.clientY
       }
