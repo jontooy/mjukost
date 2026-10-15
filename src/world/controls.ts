@@ -65,8 +65,8 @@ export class FirstPersonControls {
 
   update(dt: number) {
     const camera = this.engine.camera
-    camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ')
     if (!this.enabled) return
+    camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ')
 
     let ahead = 0
     let side = 0
