@@ -73,7 +73,7 @@ export function createPostTexture(post: Post): THREE.CanvasTexture {
   const imageUrl = post.body.match(/!\[[^\]]*\]\(([^)\s]+)/)?.[1]
   drawPost(ctx, post, imageUrl ? 'loading' : null)
   if (imageUrl) {
-    void loadImage(imageUrl).then((image) => {
+    void loadPostImage(imageUrl).then((image) => {
       drawPost(ctx, post, image)
       texture.needsUpdate = true
     })
@@ -81,7 +81,7 @@ export function createPostTexture(post: Post): THREE.CanvasTexture {
   return texture
 }
 
-async function loadImage(url: string): Promise<HTMLImageElement | null> {
+export async function loadPostImage(url: string): Promise<HTMLImageElement | null> {
   const src = await resolvePrivateMarkdownUrls(url)
   if (src.startsWith('private://')) return null
   const image = new Image()
