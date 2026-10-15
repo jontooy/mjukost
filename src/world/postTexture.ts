@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { resolvePrivateMarkdownUrls } from '@/lib/storage'
 import type { Post } from '@/types/post'
 
 const WIDTH = 512
@@ -23,6 +24,10 @@ const DATE_LINE_HEIGHT = 26
 
 const BODY_FONT = '22px serif'
 const BODY_LINE_HEIGHT = 32
+
+const IMAGE_HEIGHT = 220
+const IMAGE_GAP = 14
+const COLOR_IMAGE_PLACEHOLDER = '#d6c8a8'
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = []
@@ -61,7 +66,40 @@ export function createPostTexture(post: Post): THREE.CanvasTexture {
   canvas.width = WIDTH
   canvas.height = HEIGHT
   const ctx = canvas.getContext('2d')!
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.anisotropy = 4
 
+  const imageUrl = post.body.match(/!\[[^\]]*\]\(([^)\s]+)/)?.[1]
+  drawPost(ctx, post, imageUrl ? 'loading' : null)
+  if (imageUrl) {
+    void loadImage(imageUrl).then((image) => {
+      drawPost(ctx, post, image)
+      texture.needsUpdate = true
+    })
+  }
+  return texture
+}
+
+async function loadImage(url: string): Promise<HTMLImageElement | null> {
+  const src = await resolvePrivateMarkdownUrls(url)
+  if (src.startsWith('private://')) return null
+  const image = new Image()
+  image.crossOrigin = 'anonymous'
+  image.src = src
+  try {
+    await image.decode()
+    return image
+  } catch {
+    return null
+  }
+}
+
+function drawPost(
+  ctx: CanvasRenderingContext2D,
+  post: Post,
+  image: HTMLImageElement | 'loading' | null,
+) {
   ctx.fillStyle = COLOR_PARCHMENT
   ctx.fillRect(0, 0, WIDTH, HEIGHT)
 
@@ -74,12 +112,10 @@ export function createPostTexture(post: Post): THREE.CanvasTexture {
   ctx.font = TITLE_FONT
   ctx.fillStyle = COLOR_TITLE
   let titleLines = wrapText(ctx, post.title, CONTENT_WIDTH)
-  let titleLineCount = titleLines.length
-  if (titleLineCount > TITLE_MAX_LINES) {
+  if (titleLines.length > TITLE_MAX_LINES) {
     const truncated = titleLines.slice(0, TITLE_MAX_LINES)
     truncated.push(appendEllipsis(ctx, truncated.pop() ?? '', CONTENT_WIDTH))
     titleLines = truncated
-    titleLineCount = TITLE_MAX_LINES
   }
   let y = TITLE_TOP
   for (const line of titleLines) {
@@ -93,22 +129,38 @@ export function createPostTexture(post: Post): THREE.CanvasTexture {
   ctx.fillText(new Date(post.created_at).toLocaleDateString(), PADDING, y)
   y += DATE_LINE_HEIGHT + 12
 
+  if (image === 'loading') {
+    ctx.fillStyle = COLOR_IMAGE_PLACEHOLDER
+    ctx.fillRect(PADDING, y, CONTENT_WIDTH, IMAGE_HEIGHT)
+    y += IMAGE_HEIGHT + IMAGE_GAP
+  } else if (image) {
+    const scale = Math.max(CONTENT_WIDTH / image.naturalWidth, IMAGE_HEIGHT / image.naturalHeight)
+    const sourceWidth = CONTENT_WIDTH / scale
+    const sourceHeight = IMAGE_HEIGHT / scale
+    ctx.drawImage(
+      image,
+      (image.naturalWidth - sourceWidth) / 2,
+      (image.naturalHeight - sourceHeight) / 2,
+      sourceWidth,
+      sourceHeight,
+      PADDING,
+      y,
+      CONTENT_WIDTH,
+      IMAGE_HEIGHT,
+    )
+    y += IMAGE_HEIGHT + IMAGE_GAP
+  }
+
   ctx.font = BODY_FONT
   ctx.fillStyle = COLOR_BODY
   const bodyLines = wrapText(ctx, stripMarkdown(post.body), CONTENT_WIDTH)
   const maxBottom = HEIGHT - BOTTOM_MARGIN
   const fitting = bodyLines.filter((_, i) => y + (i + 1) * BODY_LINE_HEIGHT <= maxBottom)
-  if (fitting.length < bodyLines.length) {
-    if (fitting.length === 0) fitting.push(bodyLines[0] ?? '')
+  if (fitting.length < bodyLines.length && fitting.length > 0) {
     fitting.push(appendEllipsis(ctx, fitting.pop() ?? '', CONTENT_WIDTH))
   }
   for (const line of fitting) {
     ctx.fillText(line, PADDING, y)
     y += BODY_LINE_HEIGHT
   }
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 4
-  return texture
 }
