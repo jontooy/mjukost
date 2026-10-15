@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import AppHeader from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -35,8 +34,6 @@ async function onSubmit() {
 
 <template>
   <div class="min-h-screen">
-    <AppHeader />
-
     <main class="mx-auto mt-6 max-w-[22rem] px-3 pb-10 sm:mt-8 sm:px-4 sm:pb-12">
       <form class="grid gap-4" @submit.prevent="onSubmit">
         <h1 class="m-0 text-xl">Set a new password</h1>
