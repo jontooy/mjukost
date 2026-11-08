@@ -686,9 +686,6 @@ onBeforeUnmount(() => {
 
     <div class="absolute top-3 right-3 left-3 flex items-start justify-between gap-3 text-white">
       <div class="flex flex-col gap-1">
-        <p v-if="worldName === 'castle'" class="m-0 font-serif text-lg tracking-wide drop-shadow">
-          The castle of notes
-        </p>
         <p v-if="worldName === 'dungeon'" class="m-0 font-serif text-lg tracking-wide drop-shadow">
           The dungeon
         </p>

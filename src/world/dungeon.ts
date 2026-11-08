@@ -406,7 +406,7 @@ function furnishCell(cell: THREE.Group, decor: Decor, m: Materials, random: () =
   }
 }
 
-export function createSkull(bone: THREE.Material, socket: THREE.Material) {
+function createSkull(bone: THREE.Material, socket: THREE.Material) {
   const skull = new THREE.Group()
   const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), bone)
   cranium.scale.set(1, 0.95, 1.15)

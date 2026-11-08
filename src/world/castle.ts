@@ -3,7 +3,6 @@ import { EYE_HEIGHT, type World } from '@/world/engine'
 import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { seededRandom } from '@/lib/random'
 import { disposeObject } from '@/world/props'
-import { createSkull } from '@/world/dungeon'
 
 const HALF_WIDTH = 9
 const HEIGHT = 12
@@ -215,7 +214,7 @@ function createThrone(wood: THREE.Material, velvet: THREE.Material, gold: THREE.
   return throne
 }
 
-// The sign-in door: the oak double door with its seal, set in a stone frame with a skull over it.
+// The sign-in door: the oak double door with its seal, set in a stone frame.
 // Behind it a short dark passage leads down, deep enough for the leaves to swing open into.
 function createDungeonDoor(stone: THREE.Material, open: boolean) {
   const group = new THREE.Group()
@@ -242,13 +241,6 @@ function createDungeonDoor(stone: THREE.Material, open: boolean) {
     -DUNGEON_PASSAGE_DEPTH,
   )
 
-  const skull = createSkull(
-    new THREE.MeshStandardMaterial({ color: '#cfc5aa', roughness: 0.9 }),
-    new THREE.MeshBasicMaterial({ color: '#000000' }),
-  )
-  skull.scale.setScalar(1.6)
-  skull.position.set(0, DOOR_HEIGHT + 0.65, 0.4)
-  group.add(skull)
   const glow = new THREE.PointLight('#ff3010', 1.5, 5, 1.6)
   glow.position.set(0, 1.2, -DUNGEON_PASSAGE_DEPTH / 2)
 
