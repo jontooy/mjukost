@@ -32,7 +32,7 @@ export interface World {
   door?: CastleDoor
   portals: Portal[]
   clamp(position: THREE.Vector3): void
-  update?(dt: number, elapsed: number): void
+  update?(dt: number, elapsed: number, viewer: THREE.Vector3): void
   dispose(): void
 }
 
@@ -135,7 +135,7 @@ export class Engine {
     if (!world) return
     const dt = Math.min(this.timer.getDelta(), 0.1)
     this.onFrame?.(dt)
-    world.update?.(dt, this.timer.getElapsed())
+    world.update?.(dt, this.timer.getElapsed(), this.camera.position)
     this.runAnimations(dt)
     const pick = this.centerPick
       ? this.pickAt(

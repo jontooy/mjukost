@@ -1,8 +1,12 @@
 import * as THREE from 'three'
-import type { Engine } from '@/world/engine'
+import { EYE_HEIGHT, type Engine } from '@/world/engine'
 
 const WALK_SPEED = 4
 const RUN_SPEED = 7
+const FLY_SPEED = 10
+const FLY_VERTICAL_SPEED = 7
+const GRAVITY = 25
+const TERMINAL_SPEED = 78
 const MOUSE_SENSITIVITY = 0.0022
 const TOUCH_SENSITIVITY = 0.005
 const JOYSTICK_RADIUS = 60
@@ -18,12 +22,14 @@ export interface Joystick {
 
 export class FirstPersonControls {
   enabled = true
+  flying = false
   onInteract: (() => void) | null = null
   readonly joystick: Joystick = { active: false, originX: 0, originY: 0, x: 0, y: 0 }
 
   private readonly keys = new Set<string>()
   private yaw = 0
   private pitch = 0
+  private fallSpeed = 0
   private joystickTouch: number | null = null
   private lookTouch: { id: number; x: number; y: number } | null = null
   private readonly forward = new THREE.Vector3()
@@ -78,15 +84,35 @@ export class FirstPersonControls {
       ahead -= this.joystick.y / JOYSTICK_RADIUS
       side += this.joystick.x / JOYSTICK_RADIUS
     }
-    if (ahead === 0 && side === 0) return
+    let rise = 0
+    if (this.flying) {
+      if (this.keys.has('Space')) rise += 1
+      if (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) rise -= 1
+    }
 
-    this.forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
-    this.right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw))
-    this.move.set(0, 0, 0).addScaledVector(this.forward, ahead).addScaledVector(this.right, side)
-    if (this.move.lengthSq() > 1) this.move.normalize()
+    if (ahead !== 0 || side !== 0) {
+      this.forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
+      this.right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw))
+      this.move.set(0, 0, 0).addScaledVector(this.forward, ahead).addScaledVector(this.right, side)
+      if (this.move.lengthSq() > 1) this.move.normalize()
+      const running = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')
+      const speed = this.flying ? FLY_SPEED : running ? RUN_SPEED : WALK_SPEED
+      camera.position.addScaledVector(this.move, speed * dt)
+    }
 
-    const speed = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? RUN_SPEED : WALK_SPEED
-    camera.position.addScaledVector(this.move, speed * dt)
+    // The ground only catches you from above; below it there is nothing to land on.
+    if (this.flying) {
+      this.fallSpeed = 0
+      camera.position.y += rise * FLY_VERTICAL_SPEED * dt
+    } else if (camera.position.y !== EYE_HEIGHT) {
+      const above = camera.position.y > EYE_HEIGHT
+      this.fallSpeed = Math.min(this.fallSpeed + GRAVITY * dt, TERMINAL_SPEED)
+      camera.position.y -= this.fallSpeed * dt
+      if (above && camera.position.y <= EYE_HEIGHT) {
+        camera.position.y = EYE_HEIGHT
+        this.fallSpeed = 0
+      }
+    }
     this.engine.world?.clamp(camera.position)
   }
 
@@ -124,6 +150,7 @@ export class FirstPersonControls {
       this.onInteract?.()
       return
     }
+    if (event.code === 'Space') event.preventDefault()
     this.keys.add(event.code)
   }
 

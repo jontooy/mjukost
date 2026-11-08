@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Post } from '@/types/post'
 import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
@@ -7,51 +8,72 @@ import { createDesk, createPainting, disposeObject, seededRandom } from '@/world
 const FOG_COLOR = '#9aa58c'
 const PAINTING_SPACING = 2.4
 const PATH_EDGE = 2.6
-const TREE_COUNT = 420
-const FIREFLY_COUNT = 120
+const WORLD_SEED = 7
+
+const CHUNK_SIZE = 24
+const CELL_SIZE = 6
+const CELLS_PER_CHUNK = CHUNK_SIZE / CELL_SIZE
+const VIEW_CHUNKS = 4
+const TREE_CAPACITY = (2 * VIEW_CHUNKS + 1) ** 2 * CELLS_PER_CHUNK ** 2 * 2
+const GIANT_CHANCE = 0.6
+const SAPLING_CHANCE = 0.45
+const TRUNK_CLEARANCE = 0.35
+
+const GROUND_SEGMENT = 2
+const GROUND_HALF = (VIEW_CHUNKS + 1) * CHUNK_SIZE
+
+const SUN_OFFSET = new THREE.Vector3(-40, 60, 20)
+const SHADOW_EXTENT = 56
+
+const FIREFLY_COUNT = 160
+const FIREFLY_RANGE = 40
+
+// The player stays outside this box around the castle at the origin; the gate faces +z.
+const CASTLE_BOUNDS = { minX: -15, maxX: 15, minZ: -16, maxZ: 1 }
+
+interface Tree {
+  x: number
+  z: number
+  yaw: number
+  height: number
+  trunkRadius: number
+  crownRadius: number
+  crownBase: number
+  hue: number
+  lightness: number
+}
 
 export function createForest(posts: Post[], options: { signedIn: boolean }): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(FOG_COLOR)
-  scene.fog = new THREE.FogExp2(FOG_COLOR, 0.035)
+  scene.fog = new THREE.FogExp2(FOG_COLOR, 0.03)
 
   scene.add(new THREE.HemisphereLight('#dfe8c8', '#3b3424', 1.2))
   const sun = new THREE.DirectionalLight('#ffe2b0', 1.6)
-  sun.position.set(-20, 30, 10)
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048)
-  Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, far: 80 })
-  scene.add(sun)
+  Object.assign(sun.shadow.camera, {
+    left: -SHADOW_EXTENT,
+    right: SHADOW_EXTENT,
+    top: SHADOW_EXTENT,
+    bottom: -SHADOW_EXTENT,
+    far: 200,
+  })
+  scene.add(sun, sun.target)
 
-  const gateZ = -Math.max(20, posts.length * PAINTING_SPACING + 10)
-  const random = seededRandom(7)
+  const pathStart = Math.max(20, posts.length * PAINTING_SPACING + 10)
+  const pathEnd = pathStart + 10
 
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(160, 160, 80, 80),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }),
-  )
-  ground.rotation.x = -Math.PI / 2
-  ground.receiveShadow = true
-  const groundColors: number[] = []
-  const shade = new THREE.Color()
-  for (let i = 0; i < ground.geometry.attributes.position!.count; i++) {
-    shade.setHSL(0.22 + random() * 0.05, 0.3, 0.22 + random() * 0.08)
-    groundColors.push(shade.r, shade.g, shade.b)
-  }
-  ground.geometry.setAttribute('color', new THREE.Float32BufferAttribute(groundColors, 3))
-  scene.add(ground)
-
-  const pathLength = 12 - gateZ
   const path = new THREE.Mesh(
-    new THREE.PlaneGeometry(3, pathLength),
+    new THREE.PlaneGeometry(3, pathEnd),
     new THREE.MeshStandardMaterial({ color: '#6e5a40', roughness: 1 }),
   )
   path.rotation.x = -Math.PI / 2
-  path.position.set(0, 0.01, 10 - pathLength / 2)
+  path.position.set(0, 0.01, pathEnd / 2)
   path.receiveShadow = true
   scene.add(path)
 
-  addTrees(scene, random, gateZ)
+  const woods = createWoods(scene, sun, pathEnd)
 
   const interactables: Interactable[] = []
   const standMaterial = new THREE.MeshStandardMaterial({ color: '#4a3a28', roughness: 0.9 })
@@ -64,7 +86,7 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
     pole.position.y = 0.6
     pole.castShadow = true
     stand.add(painting, pole)
-    stand.position.set(side * PATH_EDGE, 0, -index * PAINTING_SPACING)
+    stand.position.set(side * PATH_EDGE, 0, pathStart - index * PAINTING_SPACING)
     stand.rotation.y = (-side * Math.PI) / 2
     scene.add(stand)
     interactables.push({ object: painting, label: post.title, action: { kind: 'read', post } })
@@ -72,7 +94,7 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
 
   if (options.signedIn) {
     const desk = createDesk('#5a4128')
-    desk.position.set(2.2, 0, 4)
+    desk.position.set(2.2, 0, pathStart + 4)
     desk.rotation.y = -Math.PI / 2
     scene.add(desk)
     interactables.push({
@@ -82,67 +104,239 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
     })
   }
 
-  const gate = createCastleGate(gateZ, options.signedIn)
+  const gate = createCastleGate(options.signedIn)
   scene.add(gate.castle)
 
-  const fireflies = createFireflies(random, gateZ)
+  const fireflies = createFireflies(seededRandom(WORLD_SEED))
   scene.add(fireflies.points)
 
   return {
     name: 'forest',
     scene,
-    spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, 8), yaw: 0 },
-    arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, gateZ + 4), yaw: Math.PI } },
+    spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, pathStart + 8), yaw: 0 },
+    arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI } },
     interactables,
     door: gate.door,
-    portals: [
-      { position: new THREE.Vector3(0, EYE_HEIGHT, gateZ + 0.75), radius: 1.3, to: 'castle' },
-    ],
+    portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0.75), radius: 1.3, to: 'castle' }],
     clamp(position) {
-      position.x = THREE.MathUtils.clamp(position.x, -13, 13)
-      position.z = THREE.MathUtils.clamp(position.z, gateZ + 1, 10)
+      pushOutOfCastle(position)
+      woods.collide(position)
     },
-    update(_dt, elapsed) {
-      fireflies.tick(elapsed)
+    update(_dt, elapsed, viewer) {
+      woods.refresh(viewer)
+      fireflies.tick(elapsed, viewer)
     },
     dispose: () => disposeObject(scene),
   }
 }
 
-function addTrees(scene: THREE.Scene, random: () => number, gateZ: number) {
+// Trees and ground are generated per chunk from a hash of the chunk coordinates, so any
+// place in the forest looks the same every visit. Only chunks around the viewer exist.
+function createWoods(scene: THREE.Scene, sun: THREE.DirectionalLight, pathEnd: number) {
   const trunks = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.15, 0.25, 3, 6),
+    new THREE.CylinderGeometry(0.55, 1, 1, 8).translate(0, 0.5, 0),
     new THREE.MeshStandardMaterial({ color: '#3d2e1e', roughness: 1 }),
-    TREE_COUNT,
+    TREE_CAPACITY,
   )
   const crowns = new THREE.InstancedMesh(
-    new THREE.ConeGeometry(1.4, 4, 7),
+    crownGeometry(),
     new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, flatShading: true }),
-    TREE_COUNT,
+    TREE_CAPACITY,
   )
-  trunks.castShadow = crowns.castShadow = true
-
-  const matrix = new THREE.Matrix4()
-  const color = new THREE.Color()
-  let placed = 0
-  while (placed < TREE_COUNT) {
-    const x = (random() - 0.5) * 120
-    const z = gateZ - 30 + random() * (70 - gateZ)
-    const inClearing = Math.abs(x) < 5 && z > gateZ - 2
-    const inCastle = Math.abs(x) < 22 && z < gateZ + 2 && z > gateZ - 26
-    if (inClearing || inCastle) continue
-    const scale = 0.7 + random() * 0.9
-    matrix.makeScale(scale, scale, scale).setPosition(x, 1.5 * scale, z)
-    trunks.setMatrixAt(placed, matrix)
-    matrix.makeScale(scale, scale * (0.9 + random() * 0.5), scale).setPosition(x, 4.5 * scale, z)
-    crowns.setMatrixAt(placed, matrix)
-    crowns.setColorAt(placed, color.setHSL(0.25 + random() * 0.08, 0.35, 0.2 + random() * 0.1))
-    placed++
+  for (const mesh of [trunks, crowns]) {
+    mesh.castShadow = mesh.receiveShadow = true
+    mesh.frustumCulled = false
   }
-  scene.add(trunks, crowns)
+
+  const groundSegments = (GROUND_HALF * 2) / GROUND_SEGMENT
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(
+      GROUND_HALF * 2,
+      GROUND_HALF * 2,
+      groundSegments,
+      groundSegments,
+    ).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }),
+  )
+  ground.receiveShadow = true
+  const groundPositions = ground.geometry.attributes.position as THREE.BufferAttribute
+  const groundColors = new THREE.BufferAttribute(new Float32Array(groundPositions.count * 3), 3)
+  ground.geometry.setAttribute('color', groundColors)
+  scene.add(ground, trunks, crowns)
+
+  let chunks = new Map<number, Tree[]>()
+  let currentX = NaN
+  let currentZ = NaN
+  const matrix = new THREE.Matrix4()
+  const scale = new THREE.Vector3()
+  const color = new THREE.Color()
+
+  function writeTree(index: number, tree: Tree) {
+    const trunkHeight = tree.crownBase + (tree.height - tree.crownBase) * 0.5
+    scale.set(tree.trunkRadius, trunkHeight, tree.trunkRadius)
+    trunks.setMatrixAt(
+      index,
+      matrix.makeRotationY(tree.yaw).scale(scale).setPosition(tree.x, 0, tree.z),
+    )
+    scale.set(tree.crownRadius, tree.height - tree.crownBase, tree.crownRadius)
+    matrix.makeRotationY(tree.yaw).scale(scale).setPosition(tree.x, tree.crownBase, tree.z)
+    crowns.setMatrixAt(index, matrix)
+    crowns.setColorAt(index, color.setHSL(tree.hue, 0.35, tree.lightness))
+  }
+
+  function colorGround() {
+    for (let i = 0; i < groundPositions.count; i++) {
+      const gx = Math.round((ground.position.x + groundPositions.getX(i)) / GROUND_SEGMENT)
+      const gz = Math.round((ground.position.z + groundPositions.getZ(i)) / GROUND_SEGMENT)
+      const random = seededRandom(hash(gx, gz))
+      color.setHSL(0.22 + random() * 0.05, 0.3, 0.22 + random() * 0.08)
+      groundColors.setXYZ(i, color.r, color.g, color.b)
+    }
+    groundColors.needsUpdate = true
+  }
+
+  return {
+    refresh(viewer: THREE.Vector3) {
+      const cx = Math.floor(viewer.x / CHUNK_SIZE)
+      const cz = Math.floor(viewer.z / CHUNK_SIZE)
+      if (cx === currentX && cz === currentZ) return
+      currentX = cx
+      currentZ = cz
+
+      const next = new Map<number, Tree[]>()
+      let count = 0
+      for (let x = cx - VIEW_CHUNKS; x <= cx + VIEW_CHUNKS; x++) {
+        for (let z = cz - VIEW_CHUNKS; z <= cz + VIEW_CHUNKS; z++) {
+          const key = chunkKey(x, z)
+          const trees = chunks.get(key) ?? chunkTrees(x, z, pathEnd)
+          next.set(key, trees)
+          for (const tree of trees) writeTree(count++, tree)
+        }
+      }
+      chunks = next
+      trunks.count = crowns.count = count
+      trunks.instanceMatrix.needsUpdate = crowns.instanceMatrix.needsUpdate = true
+      crowns.instanceColor!.needsUpdate = true
+
+      ground.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE)
+      colorGround()
+      sun.target.position.copy(ground.position)
+      sun.position.copy(ground.position).add(SUN_OFFSET)
+    },
+    collide(position: THREE.Vector3) {
+      const cx = Math.floor(position.x / CHUNK_SIZE)
+      const cz = Math.floor(position.z / CHUNK_SIZE)
+      for (let x = cx - 1; x <= cx + 1; x++) {
+        for (let z = cz - 1; z <= cz + 1; z++) {
+          for (const tree of chunks.get(chunkKey(x, z)) ?? []) {
+            if (position.y < 0 || position.y - EYE_HEIGHT > tree.height) continue
+            const dx = position.x - tree.x
+            const dz = position.z - tree.z
+            const reach = tree.trunkRadius + TRUNK_CLEARANCE
+            const distance = Math.hypot(dx, dz)
+            if (distance >= reach || distance === 0) continue
+            position.x = tree.x + (dx / distance) * reach
+            position.z = tree.z + (dz / distance) * reach
+          }
+        }
+      }
+    },
+  }
 }
 
-function createCastleGate(gateZ: number, open: boolean) {
+// One jittered giant and maybe one sapling per cell. Every cell consumes the same amount of
+// randomness, so the clearing filter never shifts the rest of the chunk.
+function chunkTrees(cx: number, cz: number, pathEnd: number): Tree[] {
+  const random = seededRandom(hash(cx, cz))
+  const trees: Tree[] = []
+  for (let i = 0; i < CELLS_PER_CHUNK; i++) {
+    for (let j = 0; j < CELLS_PER_CHUNK; j++) {
+      const cellX = cx * CHUNK_SIZE + i * CELL_SIZE
+      const cellZ = cz * CHUNK_SIZE + j * CELL_SIZE
+      const hasGiant = random() < GIANT_CHANCE
+      const height = 18 + random() * 22
+      const giant: Tree = {
+        x: cellX + (0.15 + random() * 0.7) * CELL_SIZE,
+        z: cellZ + (0.15 + random() * 0.7) * CELL_SIZE,
+        yaw: random() * Math.PI * 2,
+        height,
+        trunkRadius: height * 0.025 + random() * 0.3,
+        crownRadius: height * (0.14 + random() * 0.06),
+        crownBase: height * (0.3 + random() * 0.15),
+        hue: 0.25 + random() * 0.08,
+        lightness: 0.14 + random() * 0.08,
+      }
+      const hasSapling = random() < SAPLING_CHANCE
+      const saplingHeight = 3 + random() * 4
+      const sapling: Tree = {
+        x: cellX + random() * CELL_SIZE,
+        z: cellZ + random() * CELL_SIZE,
+        yaw: random() * Math.PI * 2,
+        height: saplingHeight,
+        trunkRadius: 0.12 + random() * 0.08,
+        crownRadius: saplingHeight * 0.3,
+        crownBase: saplingHeight * 0.3,
+        hue: 0.25 + random() * 0.08,
+        lightness: 0.2 + random() * 0.1,
+      }
+      if (hasGiant && !inClearing(giant, pathEnd)) trees.push(giant)
+      const crowded =
+        hasGiant && Math.hypot(sapling.x - giant.x, sapling.z - giant.z) < giant.trunkRadius + 1.5
+      if (hasSapling && !crowded && !inClearing(sapling, pathEnd)) trees.push(sapling)
+    }
+  }
+  return trees
+}
+
+function inClearing(tree: Tree, pathEnd: number) {
+  const nearCastle = Math.abs(tree.x) < 24 && tree.z > -30 && tree.z < 6
+  const nearPath = Math.abs(tree.x) < 6 + tree.trunkRadius && tree.z > -2 && tree.z < pathEnd + 6
+  return nearCastle || nearPath
+}
+
+function crownGeometry() {
+  const tiers = [
+    { radius: 1, height: 0.55, base: 0 },
+    { radius: 0.75, height: 0.5, base: 0.3 },
+    { radius: 0.5, height: 0.4, base: 0.6 },
+  ]
+  const parts = tiers.map((tier) =>
+    new THREE.ConeGeometry(tier.radius, tier.height, 8).translate(
+      0,
+      tier.base + tier.height / 2,
+      0,
+    ),
+  )
+  const merged = mergeGeometries(parts)
+  for (const part of parts) part.dispose()
+  return merged
+}
+
+function chunkKey(cx: number, cz: number) {
+  return cx * 65536 + cz
+}
+
+function hash(x: number, z: number) {
+  let h = Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ WORLD_SEED
+  h = Math.imul(h ^ (h >>> 13), 1274126177)
+  return (h ^ (h >>> 16)) >>> 0
+}
+
+function pushOutOfCastle(position: THREE.Vector3) {
+  const { minX, maxX, minZ, maxZ } = CASTLE_BOUNDS
+  if (position.x <= minX || position.x >= maxX || position.z <= minZ || position.z >= maxZ) return
+  const front = maxZ - position.z
+  const back = position.z - minZ
+  const left = position.x - minX
+  const right = maxX - position.x
+  const nearest = Math.min(front, back, left, right)
+  if (nearest === front) position.z = maxZ
+  else if (nearest === back) position.z = minZ
+  else if (nearest === left) position.x = minX
+  else position.x = maxX
+}
+
+function createCastleGate(open: boolean) {
   const castle = new THREE.Group()
   const stone = new THREE.MeshStandardMaterial({
     color: '#7d7a70',
@@ -190,14 +384,14 @@ function createCastleGate(gateZ: number, open: boolean) {
   const light = new THREE.PointLight('#ffd9a0', 6, 10)
   light.position.set(0, 2.5, 2)
   castle.add(door.group, hall, light)
-  castle.position.z = gateZ
   return { castle, door }
 }
 
-function createFireflies(random: () => number, gateZ: number) {
+// Fireflies live in a box that wraps around the viewer, so they are everywhere you walk.
+function createFireflies(random: () => number) {
   const base: number[] = []
   for (let i = 0; i < FIREFLY_COUNT; i++) {
-    base.push((random() - 0.5) * 30, 0.5 + random() * 3, gateZ + random() * (14 - gateZ))
+    base.push(random() * FIREFLY_RANGE, 0.5 + random() * 3, random() * FIREFLY_RANGE)
   }
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(base, 3))
@@ -211,17 +405,21 @@ function createFireflies(random: () => number, gateZ: number) {
       fog: false,
     }),
   )
+  points.frustumCulled = false
   const positions = geometry.attributes.position as THREE.BufferAttribute
+  const half = FIREFLY_RANGE / 2
+  const wrap = (value: number, center: number) =>
+    center + THREE.MathUtils.euclideanModulo(value - center + half, FIREFLY_RANGE) - half
   return {
     points,
-    tick(elapsed: number) {
+    tick(elapsed: number, viewer: THREE.Vector3) {
       for (let i = 0; i < FIREFLY_COUNT; i++) {
         const phase = i * 1.7
         positions.setXYZ(
           i,
-          base[i * 3]! + Math.sin(elapsed * 0.6 + phase) * 0.6,
+          wrap(base[i * 3]! + Math.sin(elapsed * 0.6 + phase) * 0.6, viewer.x),
           base[i * 3 + 1]! + Math.sin(elapsed * 0.9 + phase * 2) * 0.3,
-          base[i * 3 + 2]! + Math.cos(elapsed * 0.5 + phase) * 0.6,
+          wrap(base[i * 3 + 2]! + Math.cos(elapsed * 0.5 + phase) * 0.6, viewer.z),
         )
       }
       positions.needsUpdate = true

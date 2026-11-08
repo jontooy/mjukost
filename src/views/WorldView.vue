@@ -2,7 +2,7 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as THREE from 'three'
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import sadMjukost from '@/assets/sad-mjukost.svg'
 import { createPost, deletePost, listPosts, updatePost } from '@/lib/posts'
 import { resolvePrivateMarkdownUrls, uploadPostImage } from '@/lib/storage'
@@ -11,7 +11,7 @@ import type { Post } from '@/types/post'
 import { createCastle } from '@/world/castle'
 import { FirstPersonControls } from '@/world/controls'
 import type { DoorItem } from '@/world/door'
-import { EYE_HEIGHT, Engine, type WorldName } from '@/world/engine'
+import { EYE_HEIGHT, Engine, type Portal, type WorldName } from '@/world/engine'
 import { createForest } from '@/world/forest'
 import type { Field } from '@/world/paperCanvas'
 import { WritingBoard, type BoardItem } from '@/world/writingBoard'
@@ -36,9 +36,20 @@ interface Hover {
   y: number
 }
 
+interface SavedPosition {
+  world: WorldName
+  x: number
+  y: number
+  z: number
+  yaw: number
+  pitch: number
+  flying: boolean
+}
+
 const PORTAL_PUSHBACK = 1.5
 const CAMERA_SECONDS = 0.9
 const IMAGE_PATTERN = /!\[([^\]]*)\]\(([^)\s]+)\)/g
+const POSITION_KEY = 'mjukost-position'
 
 const auth = useAuthStore()
 const isTouch = matchMedia('(pointer: coarse)').matches
@@ -61,6 +72,12 @@ const reading = ref<{ post: Post; html: string } | null>(null)
 const busy = ref(false)
 const readError = ref('')
 const joystick = reactive({ active: false, originX: 0, originY: 0, x: 0, y: 0 })
+const consoleOpen = ref(false)
+const consoleLine = ref('')
+const consoleMessage = ref('')
+const consoleInput = ref<HTMLInputElement | null>(null)
+const coordinates = ref('')
+const flying = ref(false)
 
 const form = reactive({ title: '', body: '', email: '', password: '' })
 const status = reactive({ text: '', isError: false })
@@ -159,23 +176,33 @@ function onFrame(dt: number) {
   locked.value = controls.locked
   Object.assign(joystick, controls.joystick)
   focusLabel.value = mode.value === 'walk' ? (engine.focused?.label ?? null) : null
+  if (consoleOpen.value) {
+    const { x, y, z } = engine.camera.position
+    coordinates.value = `XYZ: ${x.toFixed(1)} / ${(y - EYE_HEIGHT).toFixed(1)} / ${z.toFixed(1)}`
+  }
   drawFocusSurface()
 
   const world = engine.world
   if (!world || mode.value !== 'walk' || travelling) return
   for (const portal of world.portals) {
-    const offset = engine.camera.position.clone().sub(portal.position).setY(0)
+    const offset = engine.camera.position.clone().sub(portal.position)
     if (offset.length() > portal.radius) continue
     if (portal.to === 'castle' && !auth.isAuthenticated) {
-      engine.camera.position
-        .copy(portal.position)
-        .addScaledVector(offset.normalize(), portal.radius + PORTAL_PUSHBACK)
+      pushOutOfPortal(portal, offset)
       void startDoor()
       return
     }
     void enter(portal.to, world.name)
     return
   }
+}
+
+function pushOutOfPortal(portal: Portal, offset: THREE.Vector3) {
+  const y = engine.camera.position.y
+  engine.camera.position
+    .copy(portal.position)
+    .addScaledVector(offset.setY(0).normalize(), portal.radius + PORTAL_PUSHBACK)
+    .setY(y)
 }
 
 async function focusOn(next: Mode, view: { position: THREE.Vector3; lookAt: THREE.Vector3 }) {
@@ -508,20 +535,153 @@ async function onDelete(post: Post) {
 
 async function onSignOut() {
   if (session) await endWriting()
+  if (consoleOpen.value) closeConsole()
+  flying.value = false
   await auth.signOut()
   closeRead()
   await enter('forest', worldName.value === 'castle' ? 'castle' : undefined)
 }
 
+function openConsole() {
+  consoleOpen.value = true
+  consoleLine.value = ''
+  consoleMessage.value = ''
+  controls.enabled = false
+  controls.unlock()
+  void nextTick(() => consoleInput.value?.focus())
+}
+
+function closeConsole() {
+  consoleOpen.value = false
+  controls.enabled = true
+}
+
+async function teleportToSpawn() {
+  const world = engine.world
+  if (!world || worldName.value !== 'forest') return enter('forest')
+  engine.camera.position.copy(world.spawn.position)
+  engine.camera.rotation.set(0, world.spawn.yaw, 0, 'YXZ')
+  controls.syncFromCamera()
+}
+
+// While focused on the desk or door, the camera is posed; save where the player stood instead.
+function savePosition() {
+  if (!engine.world) return
+  const position = returnTo?.position ?? engine.camera.position
+  const rotation = new THREE.Euler().setFromQuaternion(
+    returnTo?.quaternion ?? engine.camera.quaternion,
+    'YXZ',
+  )
+  const saved: SavedPosition = {
+    world: worldName.value,
+    x: position.x,
+    y: position.y,
+    z: position.z,
+    yaw: rotation.y,
+    pitch: rotation.x,
+    flying: flying.value,
+  }
+  sessionStorage.setItem(POSITION_KEY, JSON.stringify(saved))
+}
+
+async function restorePosition() {
+  const saved = JSON.parse(sessionStorage.getItem(POSITION_KEY) ?? 'null') as SavedPosition | null
+  if (!saved || (saved.world === 'castle' && !auth.isAuthenticated)) return enter('forest')
+  await enter(saved.world)
+  if (loadError.value) return
+  engine.camera.position.set(saved.x, saved.y, saved.z)
+  engine.camera.rotation.set(saved.pitch, saved.yaw, 0, 'YXZ')
+  controls.syncFromCamera()
+  flying.value = saved.flying
+}
+
+interface ConsoleCommand {
+  name: string
+  usage: string
+  description: string
+  run: (args: string) => unknown
+}
+
+const COMMANDS: ConsoleCommand[] = [
+  {
+    name: '/help',
+    usage: '/help',
+    description: 'List all commands',
+    run: () => {
+      consoleMessage.value = COMMANDS.map((c) => `${c.usage}  ${c.description}`).join('\n')
+    },
+  },
+  {
+    name: '/tp',
+    usage: '/tp x y z | /tp castle',
+    description: 'Teleport to coordinates, or back to the starting position',
+    run: (args) => {
+      if (args === 'castle') {
+        closeConsole()
+        return teleportToSpawn()
+      }
+      const numbers = args.replace(/[(),]/g, ' ').trim().split(/\s+/).map(Number)
+      if (numbers.length !== 3 || !numbers.every(Number.isFinite)) {
+        consoleMessage.value = 'Usage: /tp x y z | /tp castle'
+        return
+      }
+      const [x, y, z] = numbers as [number, number, number]
+      closeConsole()
+      engine.camera.position.set(x, y + EYE_HEIGHT, z)
+      engine.world?.clamp(engine.camera.position)
+      // Teleporting never travels between worlds; the castle is only entered through its gate.
+      for (const portal of engine.world?.portals ?? []) {
+        const offset = engine.camera.position.clone().sub(portal.position)
+        if (offset.length() <= portal.radius) pushOutOfPortal(portal, offset)
+      }
+    },
+  },
+  {
+    name: '/fly',
+    usage: '/fly [on|off]',
+    description: 'Toggle flying, or set it: Space to rise, Shift to sink',
+    run: (args) => {
+      if (args !== '' && args !== 'on' && args !== 'off') {
+        consoleMessage.value = 'Usage: /fly [on|off]'
+        return
+      }
+      flying.value = args === '' ? !flying.value : args === 'on'
+      closeConsole()
+    },
+  },
+]
+
+async function runCommand() {
+  const line = consoleLine.value.trim()
+  consoleLine.value = ''
+  const [name, ...args] = line.split(/\s+/)
+  const command = COMMANDS.find((c) => c.name === name)
+  if (!command) {
+    consoleMessage.value = `Unknown command: ${line}. Type /help for commands.`
+    return
+  }
+  await command.run(args.join(' '))
+}
+
 function onKeyDown(event: KeyboardEvent) {
+  const canToggle = consoleOpen.value || (mode.value === 'walk' && !loading.value && !travelling)
+  if (event.code === 'Tab' && !isTouch && auth.isAuthenticated && canToggle) {
+    event.preventDefault()
+    if (consoleOpen.value) closeConsole()
+    else openConsole()
+    return
+  }
   if (event.code !== 'Escape') return
-  if (mode.value === 'read') closeRead()
+  if (consoleOpen.value) closeConsole()
+  else if (mode.value === 'read') closeRead()
   else stepBack()
 }
 
 watch(worldName, (name) =>
   document.documentElement.classList.toggle('private-mode', name === 'castle'),
 )
+
+watch(flying, (on) => (controls.flying = on))
 
 onMounted(() => {
   engine = new Engine(canvasEl.value!)
@@ -530,11 +690,13 @@ onMounted(() => {
   engine.onFrame = onFrame
   engine.start()
   window.addEventListener('keydown', onKeyDown)
-  void enter('forest')
+  window.addEventListener('pagehide', savePosition)
+  void restorePosition()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('pagehide', savePosition)
   session?.board.dispose()
   controls.dispose()
   engine.dispose()
@@ -595,10 +757,15 @@ onBeforeUnmount(() => {
     />
 
     <div class="absolute top-3 right-3 left-3 flex items-start justify-between gap-3 text-white">
-      <p class="m-0 font-serif text-lg tracking-wide drop-shadow">
-        {{ worldName === 'castle' ? 'The castle of notes' : 'mjukost forest' }}
-      </p>
-      <div class="flex gap-2">
+      <div class="flex flex-col gap-1">
+        <p v-if="worldName === 'castle'" class="m-0 font-serif text-lg tracking-wide drop-shadow">
+          The castle of notes
+        </p>
+        <p v-if="consoleOpen" class="m-0 w-fit bg-black/50 px-2 py-0.5 font-mono text-[0.95rem]">
+          {{ coordinates }}
+        </p>
+      </div>
+      <div class="ml-auto flex gap-2">
         <button
           v-if="mode === 'write' || mode === 'door'"
           type="button"
@@ -635,11 +802,31 @@ onBeforeUnmount(() => {
     </p>
 
     <p
-      v-if="!isTouch && !locked && mode === 'walk' && !loading"
+      v-if="!isTouch && !locked && !consoleOpen && mode === 'walk' && !loading"
       class="pointer-events-none absolute bottom-6 left-1/2 m-0 -translate-x-1/2 rounded bg-black/55 px-4 py-2 text-center text-[0.9rem] text-white"
     >
-      Click to look around · WASD to walk · Shift to run · E to interact
+      Click to look around · WASD to
+      {{ flying ? 'fly · Space up · Shift down' : 'walk · Shift to run' }} · E to interact
     </p>
+
+    <form
+      v-if="consoleOpen"
+      class="absolute right-3 bottom-3 left-3 font-mono text-[0.95rem] text-white"
+      @submit.prevent="runCommand"
+    >
+      <p v-if="consoleMessage" class="m-0 mb-1 w-fit bg-black/50 px-2 py-0.5 whitespace-pre-line">
+        {{ consoleMessage }}
+      </p>
+      <input
+        ref="consoleInput"
+        v-model="consoleLine"
+        class="block w-full border-0 bg-black/50 px-2 py-1 text-white outline-none"
+        aria-label="Console"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+      />
+    </form>
 
     <template v-if="isTouch && mode === 'walk'">
       <div

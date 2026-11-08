@@ -118,6 +118,7 @@ export function createCastle(notes: Post[]): World {
     clamp(position) {
       position.x = THREE.MathUtils.clamp(position.x, -HALF_WIDTH + 0.8, HALF_WIDTH - 0.8)
       position.z = THREE.MathUtils.clamp(position.z, -length + 1, -0.3)
+      position.y = Math.min(position.y, HEIGHT - 0.3)
     },
     update(_dt, elapsed) {
       torches.forEach((torch, index) => {
