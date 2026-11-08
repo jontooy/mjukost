@@ -20,7 +20,6 @@ const EIGHTH_TICKS = 96 // Tone's default PPQ is 192 per quarter note
 export class MedievalEngine {
   private running = false
   private disposed = false
-  private pending: EngineSettings | null = null
   private current!: EngineSettings
   private random = seededRandom(0)
   private section: Section | null = null
@@ -61,7 +60,6 @@ export class MedievalEngine {
   stop(): void {
     if (!this.running) return
     this.running = false
-    this.pending = null
     const transport = Tone.getTransport()
     transport.stop()
     transport.cancel(0)
@@ -71,8 +69,11 @@ export class MedievalEngine {
     this.drone.silence(now)
   }
 
-  update(settings: EngineSettings): void {
-    if (this.running) this.pending = { ...settings }
+  // Starts over at once with new settings, so a new world gets its own music right away.
+  restart(settings: EngineSettings): void {
+    if (!this.running) return
+    this.stop()
+    this.start(settings)
   }
 
   setReverbWet(wet: number): void {
@@ -118,22 +119,7 @@ export class MedievalEngine {
       )
     }
     const endTick = startTick + PHRASE_BARS * BAR_EIGHTHS * EIGHTH_TICKS
-    transport.scheduleOnce((time) => {
-      if (this.pending) {
-        const pending = this.pending
-        const boundary = time + Tone.Ticks(EIGHTH_TICKS).toSeconds()
-        const changed =
-          pending.mode !== this.current.mode ||
-          pending.danceForm !== this.current.danceForm ||
-          pending.seed !== this.current.seed
-        if (pending.seed !== this.current.seed) this.random = seededRandom(pending.seed)
-        if (changed) this.section = null
-        transport.bpm.setValueAtTime(pending.tempo, boundary)
-        this.drone.sound(MODES[pending.mode].final, boundary)
-        this.current = pending
-        this.pending = null
-      }
-      this.schedulePhrase(endTick)
-    }, `${endTick - EIGHTH_TICKS}i`)
+    // Schedule the next phrase one eighth early, so all of its events lie in the future.
+    transport.scheduleOnce(() => this.schedulePhrase(endTick), `${endTick - EIGHTH_TICKS}i`)
   }
 }

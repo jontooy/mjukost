@@ -71,8 +71,8 @@ export function useMedievalMusic() {
     settings.danceForm = preset.danceForm
     settings.tempo = preset.tempo
     reverbWet = preset.reverbWet
-    engine?.update(settings)
     engine?.setReverbWet(reverbWet)
+    engine?.restart(settings)
   }
 
   // Tears down the audio but keeps the visitor's on/off choice.
