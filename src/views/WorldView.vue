@@ -61,7 +61,6 @@ const focusLabel = ref<string | null>(null)
 const hover = ref<Hover | null>(null)
 const reading = ref<{ post: Post; html: string } | null>(null)
 const writing = ref<{ post: Post | null; isPrivate: boolean; slot: number } | null>(null)
-const preview = ref('')
 const busy = ref(false)
 const readError = ref('')
 const joystick = reactive({ active: false, originX: 0, originY: 0, x: 0, y: 0 })
@@ -232,7 +231,6 @@ function startWriting(isPrivate: boolean, slot: number, post: Post | null) {
   reading.value = null
   form.title = post?.title ?? ''
   form.body = post?.body ?? ''
-  preview.value = ''
   setStatus('')
   writing.value = { post, isPrivate, slot }
   mode.value = 'write'
@@ -256,7 +254,7 @@ function focusInput(input: HTMLInputElement | HTMLTextAreaElement | null) {
   input.setSelectionRange(input.value.length, input.value.length)
 }
 
-// Uploads images and inserts them into the text where the cursor is, as the preview shows them.
+// Uploads images and inserts them into the text where the cursor is.
 // Only private notes, in the dungeon, take images.
 async function addImages(files: File[]) {
   const active = writing.value
@@ -299,12 +297,12 @@ async function seal() {
   const active = writing.value
   if (!active || busy.value) return
   const title = form.title.trim()
-  if (!title) {
-    setStatus('The title is still empty', true)
-    focusInput(titleInput.value)
+  const body = form.body.trim()
+  if (!body) {
+    setStatus('The text is still empty', true)
+    focusInput(bodyInput.value)
     return
   }
-  const body = form.body.trim()
   busy.value = true
   setStatus('Sealing…')
   try {
@@ -443,7 +441,7 @@ function editReading() {
 }
 
 async function onDelete(post: Post) {
-  if (!confirm(`Delete "${post.title}"?`)) return
+  if (!confirm(post.title ? `Delete "${post.title}"?` : 'Delete this post?')) return
   busy.value = true
   readError.value = ''
   try {
@@ -628,20 +626,6 @@ watch(worldName, (name) => {
 
 watch(flying, (on) => (controls.flying = on))
 
-// The preview follows the text after a short pause, so private image links are not signed per keystroke.
-let previewTimer = 0
-watch(
-  () => (writing.value ? form.body : null),
-  (body) => {
-    clearTimeout(previewTimer)
-    if (body === null) return
-    previewTimer = window.setTimeout(async () => {
-      const html = await renderMarkdown(body)
-      if (writing.value && form.body === body) preview.value = html
-    }, 300)
-  },
-)
-
 onMounted(() => {
   engine = new Engine(canvasEl.value!)
   controls = new FirstPersonControls(engine, canvasEl.value!)
@@ -713,7 +697,8 @@ onBeforeUnmount(() => {
         </p>
       </div>
       <div class="ml-auto flex gap-2">
-        <MusicPlayer />
+        <!-- Hidden, not unmounted: the dungeon is silent, but the music must stay ready above. -->
+        <MusicPlayer v-show="worldName !== 'dungeon'" />
         <button
           v-if="mode === 'door'"
           type="button"
@@ -827,7 +812,7 @@ onBeforeUnmount(() => {
       @click.self="closeRead"
     >
       <section
-        class="max-h-[85vh] w-full max-w-[40rem] overflow-y-auto rounded-md border border-border bg-page p-5 text-ink shadow-2xl"
+        class="max-h-[90vh] w-full max-w-[64rem] overflow-y-auto rounded-md border border-border bg-page p-5 text-ink shadow-2xl"
       >
         <div class="mb-4 flex items-start justify-between gap-4">
           <h1 class="m-0 text-xl font-normal break-words sm:text-2xl">{{ reading.post.title }}</h1>
@@ -891,7 +876,7 @@ onBeforeUnmount(() => {
           v-model="form.title"
           class="block w-full rounded-[0.35rem] border border-border bg-surface px-3 py-2 text-lg text-ink"
           aria-label="Title"
-          placeholder="Title"
+          placeholder="Title (optional)"
           maxlength="200"
           @keydown.enter.prevent="focusInput(bodyInput)"
         />
@@ -914,12 +899,6 @@ onBeforeUnmount(() => {
             Add image
           </button>
           <span>or paste one into the text, where the cursor is</span>
-        </div>
-
-        <p class="mt-5 mb-2 text-[0.85rem] text-subtle">Preview</p>
-        <div class="rounded-[0.35rem] border border-border p-4">
-          <h1 class="m-0 text-xl font-normal break-words sm:text-2xl">{{ form.title || 'Untitled' }}</h1>
-          <div class="post-body mt-3" v-html="preview" />
         </div>
 
         <div class="mt-5 flex items-center gap-3">

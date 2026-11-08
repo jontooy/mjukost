@@ -97,8 +97,9 @@
       @apply text-[0.9em];
     }
 
+    /* Whole pictures: as wide as the text, but never taller than the screen leaves room for. */
     img {
-      @apply my-[0.85rem] block h-auto max-w-full rounded-[0.35rem];
+      @apply mx-auto my-[0.85rem] block h-auto max-h-[70vh] w-auto max-w-full rounded-[0.35rem] object-contain;
     }
   }
 }

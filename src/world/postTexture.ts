@@ -109,18 +109,21 @@ function drawPost(
 
   ctx.textBaseline = 'top'
 
-  ctx.font = TITLE_FONT
-  ctx.fillStyle = COLOR_TITLE
-  let titleLines = wrapText(ctx, post.title, CONTENT_WIDTH)
-  if (titleLines.length > TITLE_MAX_LINES) {
-    const truncated = titleLines.slice(0, TITLE_MAX_LINES)
-    truncated.push(appendEllipsis(ctx, truncated.pop() ?? '', CONTENT_WIDTH))
-    titleLines = truncated
-  }
+  // The title is optional; without one the date moves up.
   let y = TITLE_TOP
-  for (const line of titleLines) {
-    ctx.fillText(line, PADDING, y)
-    y += TITLE_LINE_HEIGHT
+  if (post.title) {
+    ctx.font = TITLE_FONT
+    ctx.fillStyle = COLOR_TITLE
+    let titleLines = wrapText(ctx, post.title, CONTENT_WIDTH)
+    if (titleLines.length > TITLE_MAX_LINES) {
+      const truncated = titleLines.slice(0, TITLE_MAX_LINES)
+      truncated.push(appendEllipsis(ctx, truncated.pop() ?? '', CONTENT_WIDTH))
+      titleLines = truncated
+    }
+    for (const line of titleLines) {
+      ctx.fillText(line, PADDING, y)
+      y += TITLE_LINE_HEIGHT
+    }
   }
 
   y += 8
@@ -129,31 +132,25 @@ function drawPost(
   ctx.fillText(new Date(post.created_at).toLocaleDateString(), PADDING, y)
   y += DATE_LINE_HEIGHT + 12
 
+  const bodyText = stripMarkdown(post.body)
   if (image === 'loading') {
     ctx.fillStyle = COLOR_IMAGE_PLACEHOLDER
     ctx.fillRect(PADDING, y, CONTENT_WIDTH, IMAGE_HEIGHT)
     y += IMAGE_HEIGHT + IMAGE_GAP
   } else if (image) {
-    const scale = Math.max(CONTENT_WIDTH / image.naturalWidth, IMAGE_HEIGHT / image.naturalHeight)
-    const sourceWidth = CONTENT_WIDTH / scale
-    const sourceHeight = IMAGE_HEIGHT / scale
-    ctx.drawImage(
-      image,
-      (image.naturalWidth - sourceWidth) / 2,
-      (image.naturalHeight - sourceHeight) / 2,
-      sourceWidth,
-      sourceHeight,
-      PADDING,
-      y,
-      CONTENT_WIDTH,
-      IMAGE_HEIGHT,
-    )
-    y += IMAGE_HEIGHT + IMAGE_GAP
+    // The whole picture, scaled to fit the room left, keeping two lines for the text if any.
+    const textRoom = bodyText ? IMAGE_GAP + BODY_LINE_HEIGHT * 2 : 0
+    const room = HEIGHT - BOTTOM_MARGIN - y - textRoom
+    const scale = Math.min(CONTENT_WIDTH / image.naturalWidth, room / image.naturalHeight)
+    const width = image.naturalWidth * scale
+    const height = image.naturalHeight * scale
+    ctx.drawImage(image, PADDING + (CONTENT_WIDTH - width) / 2, y, width, height)
+    y += height + IMAGE_GAP
   }
 
   ctx.font = BODY_FONT
   ctx.fillStyle = COLOR_BODY
-  const bodyLines = wrapText(ctx, stripMarkdown(post.body), CONTENT_WIDTH)
+  const bodyLines = wrapText(ctx, bodyText, CONTENT_WIDTH)
   const maxBottom = HEIGHT - BOTTOM_MARGIN
   const fitting = bodyLines.filter((_, i) => y + (i + 1) * BODY_LINE_HEIGHT <= maxBottom)
   if (fitting.length < bodyLines.length && fitting.length > 0) {

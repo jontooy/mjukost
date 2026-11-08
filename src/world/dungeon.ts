@@ -272,7 +272,7 @@ function buildRow(index: number, notes: Map<number, Post>, m: Materials): Row {
     row.owned.push(poster)
     row.interactables.push(
       note
-        ? { object: poster, label: note.title, action: { kind: 'read', post: note } }
+        ? { object: poster, label: note.title || 'Untitled', action: { kind: 'read', post: note } }
         : { object: poster, label: 'Write a note here', action: { kind: 'new', isPrivate: true, slot } },
     )
     const eyes = furnishCell(cell, DECOR[Math.floor(random() * DECOR.length)]!, m, random)

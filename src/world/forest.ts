@@ -117,7 +117,7 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
       stand.position.set(side * PATH_EDGE, 0, ROAD_START + row * ROW_SPACING)
       stand.rotation.y = (-side * Math.PI) / 2
       group.add(stand)
-      if (post) found.push({ object: poster, label: post.title, action: { kind: 'read', post } })
+      if (post) found.push({ object: poster, label: post.title || 'Untitled', action: { kind: 'read', post } })
       else if (options.signedIn) {
         found.push({ object: poster, label: 'Write a post here', action: { kind: 'new', isPrivate: false, slot } })
       }

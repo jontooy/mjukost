@@ -7,8 +7,8 @@ const music = useMedievalMusic()
 onBeforeUnmount(() => music.dispose())
 </script>
 
+<!-- mousedown.prevent keeps focus off the button, so Space and WASD still reach the world. -->
 <template>
-  <!-- mousedown.prevent keeps focus off the button, so Space and WASD still reach the world. -->
   <button
     type="button"
     class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-[0.35rem] border border-white/40 bg-black/40 text-white"
