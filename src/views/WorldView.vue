@@ -4,6 +4,8 @@ import { marked } from 'marked'
 import * as THREE from 'three'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import sadMjukost from '@/assets/sad-mjukost.svg'
+import MusicPlayer from '@/components/MusicPlayer.vue'
+import { useMedievalMusic } from '@/composables/useMedievalMusic'
 import { createPost, deletePost, listPosts, updatePost } from '@/lib/posts'
 import { resolvePrivateMarkdownUrls, uploadPostImage } from '@/lib/storage'
 import { useAuthStore } from '@/stores/auth'
@@ -52,6 +54,7 @@ const IMAGE_PATTERN = /!\[([^\]]*)\]\(([^)\s]+)\)/g
 const POSITION_KEY = 'mjukost-position'
 
 const auth = useAuthStore()
+const music = useMedievalMusic()
 const isTouch = matchMedia('(pointer: coarse)').matches
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
@@ -677,9 +680,10 @@ function onKeyDown(event: KeyboardEvent) {
   else stepBack()
 }
 
-watch(worldName, (name) =>
-  document.documentElement.classList.toggle('private-mode', name === 'castle'),
-)
+watch(worldName, (name) => {
+  document.documentElement.classList.toggle('private-mode', name === 'castle')
+  music.applyWorldPreset(name)
+})
 
 watch(flying, (on) => (controls.flying = on))
 
@@ -766,6 +770,7 @@ onBeforeUnmount(() => {
         </p>
       </div>
       <div class="ml-auto flex gap-2">
+        <MusicPlayer />
         <button
           v-if="mode === 'write' || mode === 'door'"
           type="button"
