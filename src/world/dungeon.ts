@@ -43,17 +43,17 @@ interface Materials {
 export function createDungeon(): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#030304')
-  scene.fog = new THREE.Fog('#030304', 2, 21)
-  scene.add(new THREE.AmbientLight('#40504a', 0.9))
+  scene.fog = new THREE.Fog('#030304', 4, 30)
+  scene.add(new THREE.AmbientLight('#a8b0a8', 1.6))
 
   const m: Materials = {
-    stone: new THREE.MeshStandardMaterial({ color: '#3a3833', roughness: 0.95, flatShading: true }),
-    floor: new THREE.MeshStandardMaterial({ color: '#26241f', roughness: 0.85 }),
-    iron: new THREE.MeshStandardMaterial({ color: '#26262a', metalness: 0.7, roughness: 0.55 }),
-    wood: new THREE.MeshStandardMaterial({ color: '#33231a', roughness: 0.9, flatShading: true }),
+    stone: new THREE.MeshStandardMaterial({ color: '#6a655c', roughness: 0.95, flatShading: true }),
+    floor: new THREE.MeshStandardMaterial({ color: '#4a453c', roughness: 0.85 }),
+    iron: new THREE.MeshStandardMaterial({ color: '#3a3a40', metalness: 0.4, roughness: 0.6 }),
+    wood: new THREE.MeshStandardMaterial({ color: '#5a3e2a', roughness: 0.9, flatShading: true }),
     bone: new THREE.MeshStandardMaterial({ color: '#cfc5aa', roughness: 0.9 }),
     socket: new THREE.MeshBasicMaterial({ color: '#000000' }),
-    straw: new THREE.MeshStandardMaterial({ color: '#5a4b24', roughness: 1, flatShading: true }),
+    straw: new THREE.MeshStandardMaterial({ color: '#8a7438', roughness: 1, flatShading: true }),
     flame: new THREE.MeshBasicMaterial({ color: '#ff8a3c' }),
   }
   const random = seededRandom(13)
@@ -222,7 +222,7 @@ export function createDungeon(): World {
     },
     update(_dt, elapsed) {
       torches.forEach((torch, index) => {
-        torch.intensity = 3 + Math.sin(elapsed * 11 + index * 2.3) * 0.5 + random() * 0.8
+        torch.intensity = 4.5 + Math.sin(elapsed * 11 + index * 2.3) * 0.6 + random() * 0.9
         flames[index]!.scale.y = 0.85 + random() * 0.3
       })
       brazierLight.intensity = 5 + Math.sin(elapsed * 3) * 1.2 + random()
