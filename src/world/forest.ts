@@ -478,14 +478,14 @@ function createCastleGate(open: boolean) {
   add(new THREE.Mesh(new THREE.ConeGeometry(3.2, 6, 8), roof), 0, 25, CASTLE_CENTER_Z)
 
   const door = new CastleDoor(open)
-  // A short roofed passage behind the gate hides the glowing hall from the courtyard.
+  // A short roofed passage behind the gate hides the dark hall from the courtyard.
   // It is wider than the doorway so the open leaves do not clip into its walls.
   const passageHalf = DOOR_HALF_WIDTH + 0.3
   const passageDepth = 1.6
   const passageZ = -0.75 - passageDepth / 2
   const hall = new THREE.Mesh(
     new THREE.PlaneGeometry(passageHalf * 2, DOOR_HEIGHT),
-    new THREE.MeshBasicMaterial({ color: '#ffb070' }),
+    new THREE.MeshBasicMaterial({ color: '#070606' }),
   )
   hall.position.set(0, DOOR_HEIGHT / 2, -1.9)
   for (const side of [-1, 1]) {
@@ -505,7 +505,8 @@ function createCastleGate(open: boolean) {
     (wallHeight + DOOR_HEIGHT) / 2,
     passageZ,
   )
-  const light = new THREE.PointLight('#ffd9a0', 6, 10)
+  // A faint cold light, so the doors and passage stay readable without a warm glow from inside.
+  const light = new THREE.PointLight('#8a96a8', 2, 8)
   light.position.set(0, 2.5, 2)
   castle.add(door.group, hall, light)
   return { castle, door }
