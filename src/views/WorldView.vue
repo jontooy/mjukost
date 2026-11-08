@@ -652,6 +652,21 @@ const COMMANDS: ConsoleCommand[] = [
       closeConsole()
     },
   },
+  {
+    name: '/music',
+    usage: '/music [on|off]',
+    description: 'Toggle the music, or set it',
+    run: (args) => {
+      if (args !== '' && args !== 'on' && args !== 'off') {
+        consoleMessage.value = 'Usage: /music [on|off]'
+        return
+      }
+      if (args === 'on') void music.play()
+      else if (args === 'off') music.stop()
+      else music.toggle()
+      closeConsole()
+    },
+  },
 ]
 
 async function runCommand() {

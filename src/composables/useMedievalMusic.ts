@@ -60,5 +60,5 @@ export function useMedievalMusic() {
     creating = null
   }
 
-  return { isPlaying, toggle, applyWorldPreset, dispose }
+  return { isPlaying, play, stop, toggle, applyWorldPreset, dispose }
 }
