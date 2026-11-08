@@ -29,7 +29,13 @@ const IMAGE_HEIGHT = 220
 const IMAGE_GAP = 14
 const COLOR_IMAGE_PLACEHOLDER = '#d6c8a8'
 
+// Each line break in the text starts a new line; an empty line stays empty.
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  return text.split('\n').flatMap((paragraph) => wrapLine(ctx, paragraph, maxWidth))
+}
+
+function wrapLine(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  if (!text) return ['']
   const lines: string[] = []
   let current = ''
   for (const word of text.split(' ')) {
@@ -52,12 +58,16 @@ function appendEllipsis(ctx: CanvasRenderingContext2D, line: string, maxWidth: n
   return `${line}…`
 }
 
+// Plain text for the poster; line breaks stay, runs of spaces and three or more breaks shrink.
 function stripMarkdown(text: string): string {
   return text
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/(^|\s)[#*_>~]+/g, '$1')
-    .replace(/\s+/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 

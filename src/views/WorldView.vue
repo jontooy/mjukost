@@ -223,7 +223,8 @@ async function leaveFocus() {
 // Renders a note's markdown exactly as the read view shows it, private images included.
 async function renderMarkdown(body: string) {
   const resolved = await resolvePrivateMarkdownUrls(body)
-  return DOMPurify.sanitize(marked.parse(resolved, { async: false }) as string)
+  // breaks: a line break in the text is a line break when read, as on the posters.
+  return DOMPurify.sanitize(marked.parse(resolved, { async: false, breaks: true }) as string)
 }
 
 // Writes the post in the given slot: the place of the poster or cell it was started from.
@@ -304,7 +305,7 @@ async function seal() {
     return
   }
   busy.value = true
-  setStatus('Sealing…')
+  setStatus('Writing…')
   try {
     if (active.post) {
       await updatePost(active.post.id, { title, body, is_private: active.post.is_private })
@@ -314,7 +315,7 @@ async function seal() {
     endWriting()
     await rebuild()
   } catch (error) {
-    setStatus(errorText(error, 'The seal would not set'), true)
+    setStatus(errorText(error, 'The post could not be written'), true)
   } finally {
     busy.value = false
   }
@@ -905,7 +906,7 @@ onBeforeUnmount(() => {
             :disabled="busy"
             @click="seal"
           >
-            {{ writing.post ? 'Seal the changes' : writing.isPrivate ? 'Seal the note' : 'Seal and publish' }}
+            Write
           </button>
           <button
             type="button"
