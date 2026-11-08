@@ -11,7 +11,14 @@ const CELL_DEPTH = 3 // shallow enough to reach a note on the back wall through 
 const CELL_LENGTH = 4
 const CELLS_START = -2
 const OUTER = CORRIDOR_HALF_WIDTH + CELL_DEPTH // the cells' back walls
-const WALK_HALF_WIDTH = CORRIDOR_HALF_WIDTH - 0.6
+const BODY = 0.35 // how close the player may come to a wall
+const WALK_HALF_WIDTH = CORRIDOR_HALF_WIDTH - BODY
+const CELL_DOOR_Z = -3.25 // centre of each cell's door, from the row's start
+const CELL_DOOR_HALF = 0.6
+const CELL_DOOR_HEIGHT = 2.4
+const PARTITION_HALF = 0.15
+const STEP = 0.1
+const TELEPORT = 3
 const ROWS_AROUND = 8 // rows kept built on each side of the viewer; the fog hides the rest
 const FOG_FAR = 28
 const TORCH_LIGHTS = 4
@@ -166,6 +173,7 @@ export function createDungeon(posts: Post[]): World {
   const arrival = { position: new THREE.Vector3(0, EYE_HEIGHT, -2.5), yaw: 0 }
   sync(arrival.position.z)
   let syncedRow = -1
+  const last = new THREE.Vector3(arrival.position.x, 0, arrival.position.z)
   return {
     name: 'dungeon',
     scene,
@@ -174,9 +182,28 @@ export function createDungeon(posts: Post[]): World {
     interactables,
     portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0.4), radius: 1.2, to: 'castle' }],
     clamp(position) {
-      position.z = Math.min(position.z, -0.3)
-      position.x = THREE.MathUtils.clamp(position.x, -WALK_HALF_WIDTH, WALK_HALF_WIDTH)
       position.y = Math.min(position.y, HEIGHT - 0.3)
+      const moved = Math.hypot(position.x - last.x, position.z - last.z)
+      // A teleport or a restored position: take it if it is open, else bring it into the corridor.
+      if (moved > TELEPORT) {
+        if (blocked(position.x, position.z)) {
+          position.x = THREE.MathUtils.clamp(position.x, -WALK_HALF_WIDTH, WALK_HALF_WIDTH)
+          position.z = Math.min(position.z, -0.3)
+        }
+        last.set(position.x, 0, position.z)
+        return
+      }
+      // Walk the move in short steps, keeping each axis only where it is open, so walls slide
+      // and nothing thinner than a step can be passed through.
+      const steps = Math.max(1, Math.ceil(moved / STEP))
+      const dx = (position.x - last.x) / steps
+      const dz = (position.z - last.z) / steps
+      for (let i = 0; i < steps; i++) {
+        if (!blocked(last.x + dx, last.z)) last.x += dx
+        if (!blocked(last.x, last.z + dz)) last.z += dz
+      }
+      position.x = last.x
+      position.z = last.z
     },
     update(_dt, elapsed, viewer) {
       const row = Math.floor((CELLS_START - viewer.z) / CELL_LENGTH)
@@ -217,12 +244,18 @@ function buildRow(index: number, notes: Post[], m: Materials): Row {
   for (const side of [1, -1] as const) {
     put(new THREE.Mesh(new THREE.BoxGeometry(0.6, HEIGHT, CELL_LENGTH), m.stone), side * (OUTER + 0.3), HEIGHT / 2, -CELL_LENGTH / 2)
     put(new THREE.Mesh(new THREE.BoxGeometry(CELL_DEPTH, HEIGHT, 0.3), m.stone), side * (CORRIDOR_HALF_WIDTH + CELL_DEPTH / 2), HEIGHT / 2, -CELL_LENGTH)
+    // The bars, with a gap for the cell's door.
     for (let z = -0.25; z > -CELL_LENGTH + 0.1; z -= 0.25) {
+      if (Math.abs(z - CELL_DOOR_Z) <= CELL_DOOR_HALF) continue
       put(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, HEIGHT, 6), m.iron), side * CORRIDOR_HALF_WIDTH, HEIGHT / 2, z)
     }
-    for (const y of [0.3, 2.4]) {
-      put(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, CELL_LENGTH), m.iron), side * CORRIDOR_HALF_WIDTH, y, -CELL_LENGTH / 2)
+    for (const z of [CELL_DOOR_Z + CELL_DOOR_HALF, CELL_DOOR_Z - CELL_DOOR_HALF]) {
+      put(new THREE.Mesh(new THREE.BoxGeometry(0.1, HEIGHT, 0.1), m.iron), side * CORRIDOR_HALF_WIDTH, HEIGHT / 2, z)
     }
+    put(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, CELL_LENGTH), m.iron), side * CORRIDOR_HALF_WIDTH, CELL_DOOR_HEIGHT, -CELL_LENGTH / 2)
+    const railToDoor = -(CELL_DOOR_Z + CELL_DOOR_HALF)
+    put(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, railToDoor), m.iron), side * CORRIDOR_HALF_WIDTH, 0.3, -railToDoor / 2)
+    put(createCellDoor(m.iron, side), side * CORRIDOR_HALF_WIDTH, 0, CELL_DOOR_Z + CELL_DOOR_HALF)
 
     // The cell's back wall faces the corridor; a cell's contents are laid out facing +z, then turned.
     const cell = new THREE.Group()
@@ -317,6 +350,38 @@ function disposeRow(row: Row) {
   row.group.traverse((node) => {
     if (node instanceof THREE.Mesh) node.geometry.dispose()
   })
+}
+
+// Whether a player standing at (x, z) would be inside a wall: the corridor is open, the bars only
+// at each cell's door, and inside a cell everything but its partitions and back wall.
+function blocked(x: number, z: number) {
+  const across = Math.abs(x)
+  if (z > -0.3 || across > OUTER - BODY) return true
+  if (across <= CORRIDOR_HALF_WIDTH - BODY) return false
+  if (z > CELLS_START - BODY) return true // the walls between the stairs and the first row
+  const rowStart = CELLS_START - Math.floor((CELLS_START - z) / CELL_LENGTH) * CELL_LENGTH
+  const along = z - rowStart
+  if (across < CORRIDOR_HALF_WIDTH + BODY) return Math.abs(along - CELL_DOOR_Z) > CELL_DOOR_HALF - BODY
+  return along > -PARTITION_HALF - BODY || along < -CELL_LENGTH + PARTITION_HALF + BODY
+}
+
+// A small barred gate hung on the door's post, standing open into the cell along its bars.
+function createCellDoor(iron: THREE.Material, side: -1 | 1) {
+  const width = CELL_DOOR_HALF * 2 - 0.05
+  const gate = new THREE.Group()
+  for (const y of [0.15, CELL_DOOR_HEIGHT - 0.15]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, width), iron)
+    rail.position.set(0, y, -width / 2)
+    gate.add(rail)
+  }
+  for (let i = 0; i <= 4; i++) {
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, CELL_DOOR_HEIGHT - 0.3, 6), iron)
+    bar.position.set(0, CELL_DOOR_HEIGHT / 2, (-i * width) / 4)
+    gate.add(bar)
+  }
+  // Closed, the gate runs along -z from its hinge; open, it swings past square into the cell.
+  gate.rotation.y = -side * (Math.PI / 2 + 0.25)
+  return gate
 }
 
 // An empty frame with blank parchment, waiting for the next note.
