@@ -43,8 +43,8 @@ interface Materials {
 export function createDungeon(): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#030304')
-  scene.fog = new THREE.Fog('#030304', 1.5, 17)
-  scene.add(new THREE.AmbientLight('#40504a', 0.6))
+  scene.fog = new THREE.Fog('#030304', 2, 21)
+  scene.add(new THREE.AmbientLight('#40504a', 0.9))
 
   const m: Materials = {
     stone: new THREE.MeshStandardMaterial({ color: '#3a3833', roughness: 0.95, flatShading: true }),
@@ -222,7 +222,7 @@ export function createDungeon(): World {
     },
     update(_dt, elapsed) {
       torches.forEach((torch, index) => {
-        torch.intensity = 2.4 + Math.sin(elapsed * 11 + index * 2.3) * 0.5 + random() * 0.8
+        torch.intensity = 3 + Math.sin(elapsed * 11 + index * 2.3) * 0.5 + random() * 0.8
         flames[index]!.scale.y = 0.85 + random() * 0.3
       })
       brazierLight.intensity = 5 + Math.sin(elapsed * 3) * 1.2 + random()
