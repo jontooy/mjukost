@@ -5,10 +5,11 @@ import type { WorldName } from '@/world/engine'
 
 const STORAGE_KEY = 'mjukost-music'
 const VOLUME = 0.5
-const WORLD_PRESETS: Record<WorldName, Omit<EngineSettings, 'seed'> & { reverbWet: number }> = {
+// The dungeon has no music: only silence down there.
+const WORLD_PRESETS: Record<WorldName, (Omit<EngineSettings, 'seed'> & { reverbWet: number }) | null> = {
   forest: { mode: 'dorian', danceForm: 'estampie', tempo: 132, reverbWet: 0.25 },
   castle: { mode: 'phrygian', danceForm: 'slowAir', tempo: 72, reverbWet: 0.5 },
-  dungeon: { mode: 'phrygian', danceForm: 'slowAir', tempo: 52, reverbWet: 0.75 },
+  dungeon: null,
 }
 
 // Off unless the visitor turned it on before; the choice survives a refresh.
@@ -22,7 +23,8 @@ const settings: EngineSettings = {
   seed: Math.floor(Math.random() * 4294967296),
 }
 
-let reverbWet = WORLD_PRESETS.forest.reverbWet
+let reverbWet = WORLD_PRESETS.forest!.reverbWet
+let silent = false // no music where the world has no preset; the on/off choice is kept
 let engine: MedievalEngine | null = null
 let creating: Promise<MedievalEngine> | null = null
 
@@ -32,7 +34,7 @@ async function startEngine() {
   const created = await pending
   if (creating !== pending) return created.dispose() // disposed while loading
   engine = created
-  if (isPlaying.value) engine.start(settings)
+  if (isPlaying.value && !silent) engine.start(settings)
 }
 
 // Browsers block audio until the visitor interacts, so music saved as on starts at the first gesture.
@@ -68,12 +70,14 @@ export function useMedievalMusic() {
 
   function applyWorldPreset(world: WorldName) {
     const preset = WORLD_PRESETS[world]
+    silent = preset === null
+    if (!preset) return engine?.stop()
     settings.mode = preset.mode
     settings.danceForm = preset.danceForm
     settings.tempo = preset.tempo
     reverbWet = preset.reverbWet
     engine?.setReverbWet(reverbWet)
-    engine?.restart(settings)
+    if (isPlaying.value) engine?.restart(settings)
   }
 
   // Tears down the audio but keeps the visitor's on/off choice.

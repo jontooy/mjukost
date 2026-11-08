@@ -1,15 +1,13 @@
 import * as THREE from 'three'
-import type { Post } from '@/types/post'
-import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
-import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
+import { EYE_HEIGHT, type World } from '@/world/engine'
+import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { seededRandom } from '@/lib/random'
-import { createDesk, createPainting, disposeObject } from '@/world/props'
+import { disposeObject } from '@/world/props'
 import { createSkull } from '@/world/dungeon'
 
 const HALF_WIDTH = 9
 const HEIGHT = 12
 const NAVE_HALF_WIDTH = 5.5 // the two rows of columns
-const NOTE_SPACING = 2.4
 const BAY = 6 // distance between columns, beams, windows and torches
 const DAIS_HALF_WIDTH = 5
 const DAIS_DEPTH = 6
@@ -18,18 +16,21 @@ const DAIS_STEPS = 3
 // Same opening and passage depth as the gate seen from the forest.
 const GATE_HALF_WIDTH = DOOR_HALF_WIDTH + 0.3
 const GATE_DEPTH = 1.6
-const DUNGEON_DOOR_X = 7.2 // in the back right corner, beside the dais
+const LENGTH = 36
+const DUNGEON_DOOR_X = 7.15 // in the back right corner, beside the dais
+const DUNGEON_PASSAGE_HALF = DOOR_HALF_WIDTH + 0.3 // wide enough for the open leaves
+const DUNGEON_PASSAGE_DEPTH = 1.8
 
 // The throne room: a nave of columns and torches, a red carpet up to the king's throne on a dais.
-export function createCastle(notes: Post[]): World {
+// It is open to everyone; the private notes are below, behind the sealed dungeon door.
+export function createCastle(options: { signedIn: boolean }): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#0d0b10')
   scene.fog = new THREE.Fog('#0d0b10', 14, 70)
   scene.add(new THREE.AmbientLight('#6a5a7a', 1.2))
 
-  const length = Math.max(36, Math.ceil(notes.length / 2) * NOTE_SPACING + 8 + DAIS_DEPTH)
-  const centerZ = -length / 2
-  const daisFront = -length + DAIS_DEPTH
+  const centerZ = -LENGTH / 2
+  const daisFront = -LENGTH + DAIS_DEPTH
   const stone = new THREE.MeshStandardMaterial({ color: '#5d5850', roughness: 0.95, flatShading: true })
   const gold = new THREE.MeshStandardMaterial({ color: '#c9a23f', metalness: 0.8, roughness: 0.35 })
   const velvet = new THREE.MeshStandardMaterial({ color: '#7a1020', roughness: 1 })
@@ -43,7 +44,7 @@ export function createCastle(notes: Post[]): World {
   }
 
   const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(HALF_WIDTH * 2, length),
+    new THREE.PlaneGeometry(HALF_WIDTH * 2, LENGTH),
     new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9 }),
   )
   floor.rotation.x = -Math.PI / 2
@@ -54,11 +55,10 @@ export function createCastle(notes: Post[]): World {
   add(ceiling, 0, HEIGHT, centerZ)
 
   for (const side of [-1, 1]) {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(0.6, HEIGHT, length), stone)
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(0.6, HEIGHT, LENGTH), stone)
     wall.receiveShadow = true
     add(wall, side * (HALF_WIDTH + 0.3), HEIGHT / 2, centerZ)
   }
-  add(new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 2 + 1.2, HEIGHT, 0.6), stone), 0, HEIGHT / 2, -length - 0.3)
   scene.add(createGate(stone))
 
   // The carpet runs from the gate to the dais, then up the steps to the throne.
@@ -74,7 +74,7 @@ export function createCastle(notes: Post[]): World {
   }
 
   // Wooden beams across the ceiling, one per bay.
-  for (let z = -BAY / 2; z > -length; z -= BAY) {
+  for (let z = -BAY / 2; z > -LENGTH; z -= BAY) {
     add(new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 2, 0.6, 0.5), wood), 0, HEIGHT - 0.3, z)
   }
 
@@ -113,14 +113,14 @@ export function createCastle(notes: Post[]): World {
     const height = DAIS_STEP * (step + 1)
     const block = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2, height, depth), stone)
     block.receiveShadow = true
-    add(block, 0, height / 2, -length + depth / 2)
+    add(block, 0, height / 2, -LENGTH + depth / 2)
   }
   const daisTop = DAIS_STEP * DAIS_STEPS
   const runner = new THREE.Mesh(new THREE.PlaneGeometry(2.4, DAIS_DEPTH - 0.4), velvet)
   runner.rotation.x = -Math.PI / 2
-  add(runner, 0, daisTop + 0.01, -length + (DAIS_DEPTH - 0.4) / 2)
+  add(runner, 0, daisTop + 0.01, -LENGTH + (DAIS_DEPTH - 0.4) / 2)
 
-  add(createThrone(wood, velvet, gold), 0, daisTop, -length + 2.2)
+  add(createThrone(wood, velvet, gold), 0, daisTop, -LENGTH + 2.2)
 
   // Royal banners on the back wall: a great one behind the throne and one to each side.
   for (const [x, width, height] of [
@@ -129,45 +129,41 @@ export function createCastle(notes: Post[]): World {
     [6.5, 2, 5.5],
   ] as const) {
     const top = HEIGHT - 1
-    add(new THREE.Mesh(new THREE.PlaneGeometry(width + 0.24, height + 0.24), gold), x, top - height / 2, -length + 0.01)
-    add(new THREE.Mesh(new THREE.PlaneGeometry(width, height), velvet), x, top - height / 2, -length + 0.02)
-    add(new THREE.Mesh(new THREE.CircleGeometry(width * 0.28, 24), gold), x, top - height * 0.4, -length + 0.03)
-    add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, width + 0.6, 8), gold), x, top + 0.1, -length + 0.1)
+    add(new THREE.Mesh(new THREE.PlaneGeometry(width + 0.24, height + 0.24), gold), x, top - height / 2, -LENGTH + 0.01)
+    add(new THREE.Mesh(new THREE.PlaneGeometry(width, height), velvet), x, top - height / 2, -LENGTH + 0.02)
+    add(new THREE.Mesh(new THREE.CircleGeometry(width * 0.28, 24), gold), x, top - height * 0.4, -LENGTH + 0.03)
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, width + 0.6, 8), gold), x, top + 0.1, -LENGTH + 0.1)
       .rotation.z = Math.PI / 2
   }
   const throneLight = new THREE.PointLight('#ffd27a', 10, 14, 1.4)
-  add(throneLight, 0, 6, -length + 4)
+  add(throneLight, 0, 6, -LENGTH + 4)
 
-  // In the back right corner, a low door leads down to the dungeon.
-  add(createDungeonDoor(stone, wood, iron), DUNGEON_DOOR_X, 0, -length)
-
-  const interactables: Interactable[] = []
-  notes.forEach((note, index) => {
-    const side = index % 2 === 0 ? -1 : 1
-    const painting = createPainting(note, '#b08a3e')
-    painting.rotation.y = (-side * Math.PI) / 2
-    add(painting, side * (HALF_WIDTH - 0.05), 2, -4.2 - Math.floor(index / 2) * NOTE_SPACING)
-    interactables.push({ object: painting, label: note.title, action: { kind: 'read', post: note } })
-  })
-
-  // The writing desk stands at the foot of the dais, beside the carpet.
-  const desk = createDesk('#3a2a1c')
-  add(desk, 3, 0, daisFront + 1.5)
-  interactables.push({ object: desk, label: 'Write a private note', action: { kind: 'new', isPrivate: true } })
+  // In the back right corner, the sealed door down to the dungeon, set into the back wall.
+  const doorLeft = DUNGEON_DOOR_X - DUNGEON_PASSAGE_HALF
+  const doorRight = DUNGEON_DOOR_X + DUNGEON_PASSAGE_HALF
+  const wallEdge = HALF_WIDTH + 0.6
+  const backWall = (from: number, to: number, bottom: number) =>
+    add(new THREE.Mesh(new THREE.BoxGeometry(to - from, HEIGHT - bottom, 0.6), stone), (from + to) / 2, (HEIGHT + bottom) / 2, -LENGTH - 0.3)
+  backWall(-wallEdge, doorLeft, 0)
+  backWall(doorRight, wallEdge, 0)
+  backWall(doorLeft, doorRight, DOOR_HEIGHT)
+  const dungeonDoor = createDungeonDoor(stone, options.signedIn)
+  add(dungeonDoor.group, DUNGEON_DOOR_X, 0, -LENGTH)
 
   return {
     name: 'castle',
     scene,
     spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, -3), yaw: 0 },
-    arrivals: { dungeon: { position: new THREE.Vector3(DUNGEON_DOOR_X, EYE_HEIGHT, -length + 3), yaw: Math.PI } },
-    interactables,
+    arrivals: { dungeon: { position: new THREE.Vector3(DUNGEON_DOOR_X, EYE_HEIGHT, -LENGTH + 3), yaw: Math.PI } },
+    interactables: [],
+    door: dungeonDoor.door,
     portals: [
       { position: new THREE.Vector3(0, EYE_HEIGHT, 0), radius: 1.2, to: 'forest' },
-      { position: new THREE.Vector3(DUNGEON_DOOR_X, EYE_HEIGHT, -length + 0.6), radius: 1, to: 'dungeon' },
+      { position: new THREE.Vector3(DUNGEON_DOOR_X, EYE_HEIGHT, -LENGTH + 0.4), radius: 1, to: 'dungeon' },
     ],
     clamp(position) {
       position.x = THREE.MathUtils.clamp(position.x, -HALF_WIDTH + 0.8, HALF_WIDTH - 0.8)
-      position.z = THREE.MathUtils.clamp(position.z, -length + 0.5, -0.3)
+      position.z = THREE.MathUtils.clamp(position.z, -LENGTH + 0.5, -0.3)
       // The dais is for the king: visitors are pushed back out along its nearer edge.
       const intoFront = daisFront + 0.6 - position.z
       const intoSide = DAIS_HALF_WIDTH + 0.6 - Math.abs(position.x)
@@ -215,48 +211,46 @@ function createThrone(wood: THREE.Material, velvet: THREE.Material, gold: THREE.
   return throne
 }
 
-// A narrow open door in a stone frame with a skull over it; beyond it, only darkness and a red glow.
-function createDungeonDoor(stone: THREE.Material, wood: THREE.Material, iron: THREE.Material) {
-  const door = new THREE.Group()
-  const width = 1.6
-  const height = 2.8
-  const opening = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ color: '#030202' }))
-  opening.position.set(0, height / 2, 0.02)
-  door.add(opening)
+// The sign-in door: the oak double door with its seal, set in a stone frame with a skull over it.
+// Behind it a short dark passage leads down, deep enough for the leaves to swing open into.
+function createDungeonDoor(stone: THREE.Material, open: boolean) {
+  const group = new THREE.Group()
+  const add = (mesh: THREE.Mesh, x: number, y: number, z: number) => {
+    mesh.position.set(x, y, z)
+    group.add(mesh)
+  }
   for (const side of [-1, 1]) {
-    const jamb = new THREE.Mesh(new THREE.BoxGeometry(0.35, height + 0.35, 0.4), stone)
-    jamb.position.set(side * (width / 2 + 0.175), (height + 0.35) / 2, 0.2)
-    door.add(jamb)
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.3, DOOR_HEIGHT + 0.4, 0.4), stone), side * (DUNGEON_PASSAGE_HALF + 0.15), (DOOR_HEIGHT + 0.4) / 2, 0.2)
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.8, DOOR_HEIGHT, DUNGEON_PASSAGE_DEPTH), stone), side * (DUNGEON_PASSAGE_HALF + 0.4), DOOR_HEIGHT / 2, -DUNGEON_PASSAGE_DEPTH / 2)
   }
-  const lintel = new THREE.Mesh(new THREE.BoxGeometry(width + 0.7, 0.35, 0.4), stone)
-  lintel.position.set(0, height + 0.175, 0.2)
-  door.add(lintel)
-
-  // One iron-strapped leaf, hinged on the right and left standing open into the hall.
-  const hinge = new THREE.Group()
-  hinge.position.set(width / 2, 0, 0.1)
-  hinge.rotation.y = Math.PI / 2 - 0.25
-  const leaf = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.1), wood)
-  leaf.position.set(-width / 2, height / 2, 0)
-  hinge.add(leaf)
-  for (const y of [0.5, 1.4, 2.3]) {
-    const strap = new THREE.Mesh(new THREE.BoxGeometry(width - 0.1, 0.09, 0.03), iron)
-    strap.position.set(-width / 2, y, 0.065)
-    hinge.add(strap)
-  }
-  door.add(hinge)
+  add(new THREE.Mesh(new THREE.BoxGeometry(DUNGEON_PASSAGE_HALF * 2 + 0.6, 0.4, 0.4), stone), 0, DOOR_HEIGHT + 0.2, 0.2)
+  add(new THREE.Mesh(new THREE.BoxGeometry(DUNGEON_PASSAGE_HALF * 2, 0.4, DUNGEON_PASSAGE_DEPTH), stone), 0, DOOR_HEIGHT + 0.2, -DUNGEON_PASSAGE_DEPTH / 2)
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(DUNGEON_PASSAGE_HALF * 2, DUNGEON_PASSAGE_DEPTH),
+    new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9 }),
+  )
+  floor.rotation.x = -Math.PI / 2
+  add(floor, 0, 0, -DUNGEON_PASSAGE_DEPTH / 2)
+  add(
+    new THREE.Mesh(new THREE.PlaneGeometry(DUNGEON_PASSAGE_HALF * 2, DOOR_HEIGHT), new THREE.MeshBasicMaterial({ color: '#030202' })),
+    0,
+    DOOR_HEIGHT / 2,
+    -DUNGEON_PASSAGE_DEPTH,
+  )
 
   const skull = createSkull(
     new THREE.MeshStandardMaterial({ color: '#cfc5aa', roughness: 0.9 }),
     new THREE.MeshBasicMaterial({ color: '#000000' }),
   )
   skull.scale.setScalar(1.6)
-  skull.position.set(0, height + 0.6, 0.35)
-  door.add(skull)
+  skull.position.set(0, DOOR_HEIGHT + 0.65, 0.4)
+  group.add(skull)
   const glow = new THREE.PointLight('#ff3010', 1.5, 5, 1.6)
-  glow.position.set(0, 1, 0.7)
-  door.add(glow)
-  return door
+  glow.position.set(0, 1.2, -DUNGEON_PASSAGE_DEPTH / 2)
+
+  const door = new CastleDoor(open)
+  group.add(door.group, glow)
+  return { group, door }
 }
 
 // An iron ring of candles on a chain, with one warm light.

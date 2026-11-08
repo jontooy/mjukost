@@ -1,8 +1,9 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { EYE_HEIGHT, type World } from '@/world/engine'
+import type { Post } from '@/types/post'
+import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
-import { disposeObject } from '@/world/props'
+import { createDesk, createPainting, disposeObject } from '@/world/props'
 
 const HEIGHT = 4
 const CORRIDOR_HALF_WIDTH = 3
@@ -11,7 +12,8 @@ const CELL_LENGTH = 4
 const CELLS = 5
 const CELLS_START = -2
 const CHAMBER_FRONT = CELLS_START - CELLS * CELL_LENGTH - 2
-const CHAMBER_DEPTH = 10
+const CHAMBER_MIN_DEPTH = 10
+const NOTE_SPACING = 2.4
 const CHAMBER_HALF_WIDTH = 6.3
 const CHAMBER_HEIGHT = 5
 const STAIR_HALF_WIDTH = 1.6
@@ -39,8 +41,9 @@ interface Materials {
   flame: THREE.Material
 }
 
-// Below the throne room: a corridor of barred cells that ends in a torture chamber.
-export function createDungeon(): World {
+// Below the throne room: a corridor of barred cells that ends in a torture chamber,
+// where the private notes hang and the desk for writing them stands.
+export function createDungeon(notes: Post[]): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#030304')
   scene.fog = new THREE.Fog('#030304', 4, 30)
@@ -66,7 +69,8 @@ export function createDungeon(): World {
     new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
 
   // Floor and ceilings.
-  const chamberBack = CHAMBER_FRONT - CHAMBER_DEPTH
+  const chamberDepth = Math.max(CHAMBER_MIN_DEPTH, Math.ceil(notes.length / 2) * NOTE_SPACING + 5)
+  const chamberBack = CHAMBER_FRONT - chamberDepth
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(OUTER * 2, -chamberBack), m.floor)
   floor.rotation.x = -Math.PI / 2
   floor.receiveShadow = true
@@ -74,9 +78,9 @@ export function createDungeon(): World {
   const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(OUTER * 2, -CHAMBER_FRONT), m.stone)
   ceiling.rotation.x = Math.PI / 2
   add(ceiling, 0, HEIGHT, CHAMBER_FRONT / 2)
-  const chamberCeiling = new THREE.Mesh(new THREE.PlaneGeometry(CHAMBER_HALF_WIDTH * 2, CHAMBER_DEPTH), m.stone)
+  const chamberCeiling = new THREE.Mesh(new THREE.PlaneGeometry(CHAMBER_HALF_WIDTH * 2, chamberDepth), m.stone)
   chamberCeiling.rotation.x = Math.PI / 2
-  add(chamberCeiling, 0, CHAMBER_HEIGHT, CHAMBER_FRONT - CHAMBER_DEPTH / 2)
+  add(chamberCeiling, 0, CHAMBER_HEIGHT, CHAMBER_FRONT - chamberDepth / 2)
 
   // Corridor walls before and after the cells, and the wall around the foot of the stairs.
   const cellsEnd = CELLS_START - CELLS * CELL_LENGTH
@@ -162,12 +166,13 @@ export function createDungeon(): World {
   for (const side of [-1, 1]) {
     const frontWidth = CHAMBER_HALF_WIDTH + 0.3 - CORRIDOR_HALF_WIDTH
     add(box(frontWidth, CHAMBER_HEIGHT, 0.6, m.stone), side * (CORRIDOR_HALF_WIDTH + frontWidth / 2), CHAMBER_HEIGHT / 2, CHAMBER_FRONT)
-    add(box(0.6, CHAMBER_HEIGHT, CHAMBER_DEPTH, m.stone), side * (CHAMBER_HALF_WIDTH + 0.3), CHAMBER_HEIGHT / 2, CHAMBER_FRONT - CHAMBER_DEPTH / 2)
+    add(box(0.6, CHAMBER_HEIGHT, chamberDepth, m.stone), side * (CHAMBER_HALF_WIDTH + 0.3), CHAMBER_HEIGHT / 2, CHAMBER_FRONT - chamberDepth / 2)
   }
   add(box(CORRIDOR_HALF_WIDTH * 2, CHAMBER_HEIGHT - HEIGHT, 0.6, m.stone), 0, (CHAMBER_HEIGHT + HEIGHT) / 2, CHAMBER_FRONT)
   add(box(CHAMBER_HALF_WIDTH * 2 + 1.2, CHAMBER_HEIGHT, 0.6, m.stone), 0, CHAMBER_HEIGHT / 2, chamberBack - 0.3)
 
-  const chamberMid = CHAMBER_FRONT - CHAMBER_DEPTH / 2
+  // The brazier, cage and block stay near the entrance however long the chamber grows.
+  const chamberMid = CHAMBER_FRONT - CHAMBER_MIN_DEPTH / 2
   const brazier = createBrazier(m)
   add(brazier.group, 0, 0, chamberMid)
   const brazierLight = add(new THREE.PointLight('#ff4a1a', 6, 12, 1.5), 0, 1.6, chamberMid) as THREE.PointLight
@@ -179,6 +184,25 @@ export function createDungeon(): World {
   add(shackled, 0, 0, chamberBack + 0.25)
   for (const x of [-2.5, 2.5]) add(createChain(m.iron, 16), x, 3.6, chamberBack + 0.08)
   add(createBones(m, random, 7), -2, 0, chamberBack + 1.2)
+
+  // The private notes hang along the chamber walls, which grow with them; the desk stands at the back.
+  const interactables: Interactable[] = []
+  notes.forEach((note, index) => {
+    const side = index % 2 === 0 ? -1 : 1
+    const painting = createPainting(note, '#5a4630')
+    painting.rotation.y = (-side * Math.PI) / 2
+    add(painting, side * (CHAMBER_HALF_WIDTH - 0.05), 2, CHAMBER_FRONT - 1.6 - Math.floor(index / 2) * NOTE_SPACING)
+    interactables.push({ object: painting, label: note.title, action: { kind: 'read', post: note } })
+  })
+  const desk = createDesk('#3a2a1c')
+  add(desk, 3, 0, chamberBack + 1.6)
+  interactables.push({ object: desk, label: 'Write a private note', action: { kind: 'new', isPrivate: true } })
+  // A torch for every stretch of chamber beyond the brazier's reach.
+  for (let z = chamberMid - 8, side = 1; z > chamberBack + 2; z -= 8, side = -side) {
+    add(box(0.12, 0.35, 0.12, m.iron), side * (CHAMBER_HALF_WIDTH - 0.1), 3, z)
+    flames.push(add(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.3, 6), m.flame), side * (CHAMBER_HALF_WIDTH - 0.1), 3.3, z) as THREE.Mesh)
+    torches.push(add(new THREE.PointLight('#ff7a30', 3, 12, 1.4), side * (CHAMBER_HALF_WIDTH - 1), 3.3, z) as THREE.PointLight)
+  }
 
   // The stairs up to the throne room, with a little warm light from above.
   for (let i = 0; i < STAIR_STEPS; i++) {
@@ -206,7 +230,7 @@ export function createDungeon(): World {
     scene,
     spawn: arrival,
     arrivals: { castle: arrival },
-    interactables: [],
+    interactables,
     portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0.4), radius: 1.2, to: 'castle' }],
     clamp(position) {
       position.z = THREE.MathUtils.clamp(position.z, chamberBack + 0.6, -0.3)

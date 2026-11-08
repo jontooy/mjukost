@@ -102,9 +102,9 @@ async function enter(name: WorldName, from?: WorldName) {
   try {
     const world =
       name === 'dungeon'
-        ? createDungeon()
+        ? createDungeon(await listPosts({ isPrivate: true }))
         : name === 'castle'
-          ? createCastle(await listPosts({ isPrivate: true }))
+          ? createCastle({ signedIn: auth.isAuthenticated })
           : createForest(await listPosts({ isPrivate: false }), { signedIn: auth.isAuthenticated })
     engine.setWorld(world, from)
     controls.syncFromCamera()
@@ -192,7 +192,7 @@ function onFrame(dt: number) {
   for (const portal of world.portals) {
     const offset = engine.camera.position.clone().sub(portal.position)
     if (offset.length() > portal.radius) continue
-    if (portal.to === 'castle' && !auth.isAuthenticated) {
+    if (portal.to === 'dungeon' && !auth.isAuthenticated) {
       pushOutOfPortal(portal, offset)
       void startDoor()
       return
@@ -409,7 +409,7 @@ async function turnKey() {
     setStatus('')
     void playDoorOpening()
     await world.door.unlock(engine)
-    const doorway = world.portals[0]!.position
+    const doorway = world.portals.find((portal) => portal.to === 'dungeon')!.position
     await engine.moveCamera(
       doorway.clone().setY(EYE_HEIGHT),
       doorway
@@ -422,7 +422,7 @@ async function turnKey() {
     mode.value = 'walk'
     engine.centerPick = true
     controls.enabled = true
-    await enter('castle', 'forest')
+    await enter('dungeon', 'castle')
   } catch (error) {
     setStatus(errorText(error, 'The key will not turn'), true)
   } finally {
@@ -545,7 +545,9 @@ async function onSignOut() {
   flying.value = false
   await auth.signOut()
   closeRead()
-  await enter('forest', worldName.value === 'forest' ? undefined : 'castle')
+  // Out of the dungeon; anywhere else, rebuild in place so sign-in-only things disappear.
+  if (worldName.value === 'dungeon') await enter('castle', 'dungeon')
+  else await rebuild()
 }
 
 function openConsole() {
@@ -592,7 +594,7 @@ function savePosition() {
 
 async function restorePosition() {
   const saved = JSON.parse(sessionStorage.getItem(POSITION_KEY) ?? 'null') as SavedPosition | null
-  if (!saved || (saved.world !== 'forest' && !auth.isAuthenticated)) return enter('forest')
+  if (!saved || (saved.world === 'dungeon' && !auth.isAuthenticated)) return enter('forest')
   await enter(saved.world)
   if (loadError.value) return
   engine.camera.position.set(saved.x, saved.y, saved.z)
@@ -699,7 +701,7 @@ function onKeyDown(event: KeyboardEvent) {
 }
 
 watch(worldName, (name) => {
-  document.documentElement.classList.toggle('private-mode', name !== 'forest')
+  document.documentElement.classList.toggle('private-mode', name === 'dungeon')
   music.applyWorldPreset(name)
 })
 

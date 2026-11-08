@@ -71,7 +71,6 @@ export class MedievalEngine {
 
   // Starts over at once with new settings, so a new world gets its own music right away.
   restart(settings: EngineSettings): void {
-    if (!this.running) return
     this.stop()
     this.start(settings)
   }

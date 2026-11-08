@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Post } from '@/types/post'
-import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT } from '@/world/door'
+import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
 import { createDesk, createPainting, disposeObject } from '@/world/props'
@@ -118,8 +118,7 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
     })
   }
 
-  const gate = createCastleGate(options.signedIn)
-  scene.add(gate.castle)
+  scene.add(createCastleGate())
 
   const fireflies = createFireflies(seededRandom(WORLD_SEED))
   scene.add(fireflies.points)
@@ -130,7 +129,6 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
     spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, pathStart + 8), yaw: 0 },
     arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI } },
     interactables,
-    door: gate.door,
     portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0.75), radius: 1.3, to: 'castle' }],
     clamp(position) {
       pushOutOfCastle(position)
@@ -361,7 +359,7 @@ function pushOutOfCastle(position: THREE.Vector3) {
   }
 }
 
-function createCastleGate(open: boolean) {
+function createCastleGate() {
   const castle = new THREE.Group()
   const stone = new THREE.MeshStandardMaterial({
     color: '#7d7a70',
@@ -477,7 +475,6 @@ function createCastleGate(open: boolean) {
   add(new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, 22, 8), stone), 0, 11, CASTLE_CENTER_Z)
   add(new THREE.Mesh(new THREE.ConeGeometry(3.2, 6, 8), roof), 0, 25, CASTLE_CENTER_Z)
 
-  const door = new CastleDoor(open)
   // A short roofed passage behind the gate hides the dark hall from the courtyard.
   // It is wider than the doorway so the open leaves do not clip into its walls.
   const passageHalf = DOOR_HALF_WIDTH + 0.3
@@ -508,8 +505,14 @@ function createCastleGate(open: boolean) {
   // A faint cold light, so the doors and passage stay readable without a warm glow from inside.
   const light = new THREE.PointLight('#8a96a8', 2, 8)
   light.position.set(0, 2.5, 2)
-  castle.add(door.group, hall, light)
-  return { castle, door }
+  // The gate always stands open; signing in happens at the dungeon door inside.
+  for (const side of [-1, 1] as const) {
+    const leaf = createDoorLeaf(side)
+    swingDoorLeaf(leaf, side, 1)
+    castle.add(leaf)
+  }
+  castle.add(hall, light)
+  return castle
 }
 
 // Fireflies live in a box that wraps around the viewer, so they are everywhere you walk.
