@@ -1,0 +1,32 @@
+name: 🧀 Deploy mjukost API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'api/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔌 Join tailnet
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: 🚀 Deploy on the Pi
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$PI_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo '100.101.66.36 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKiA5JrnFI7C9FFW+vtLxU96NO2hF3S3LSuTi5L+8ccz' > ~/.ssh/known_hosts
+          ssh pi@100.101.66.36 'cd /srv/mjukost && git fetch --quiet origin main && git reset --hard origin/main && bash api/deploy.sh'
+        env:
+          PI_SSH_KEY: ${{ secrets.PI_SSH_KEY }}

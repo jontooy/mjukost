@@ -136,7 +136,7 @@ async function run(task: () => Promise<unknown>, failure: string) {
 
 function onCreate(isPrivate: boolean, payload: { title: string; body: string }) {
   void run(
-    () => createPost({ ...payload, is_private: isPrivate, user_id: auth.user!.id }),
+    () => createPost({ ...payload, is_private: isPrivate }),
     'Failed to create post',
   )
 }

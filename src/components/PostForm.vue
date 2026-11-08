@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import CameraCapture from '@/components/CameraCapture.vue'
 import { uploadPostImage } from '@/lib/storage'
-import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   isPrivate: boolean
@@ -16,8 +15,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   submit: [payload: { title: string; body: string }]
 }>()
-
-const auth = useAuthStore()
 
 const title = ref(props.title ?? '')
 const body = ref(props.body ?? '')
@@ -66,17 +63,11 @@ function insertAtCursor(snippet: string) {
 }
 
 async function uploadImageFile(file: File) {
-  const userId = auth.user?.id
-  if (!userId) {
-    uploadError.value = 'You must be signed in to upload images'
-    return
-  }
-
   uploading.value = true
   uploadError.value = ''
 
   try {
-    const url = await uploadPostImage(file, userId, { isPrivate: props.isPrivate })
+    const url = await uploadPostImage(file, { isPrivate: props.isPrivate })
     const alt = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
     insertAtCursor(`![${alt}](${url})`)
   } catch (error) {

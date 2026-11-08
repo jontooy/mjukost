@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'api/**'
+      - '.github/workflows/deploy-api.yml'
 
 jobs:
   deploy:
@@ -24,8 +27,7 @@ jobs:
       - name: 🏗️ Build project
         run: yarn build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: 📂 Deploy dist/ to FTP
         uses: SamKirkland/FTP-Deploy-Action@4.3.3
