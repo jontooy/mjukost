@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
+import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { seededRandom } from '@/lib/random'
 import { createDesk, createPainting, disposeObject } from '@/world/props'
 
@@ -8,6 +9,9 @@ const HALF_WIDTH = 5
 const HEIGHT = 7
 const NOTE_SPACING = 2.4
 const TORCH_SPACING = 6
+// Same opening and passage depth as the gate seen from the forest.
+const GATE_HALF_WIDTH = DOOR_HALF_WIDTH + 0.3
+const GATE_DEPTH = 1.6
 
 export function createCastle(notes: Post[]): World {
   const scene = new THREE.Scene()
@@ -51,11 +55,9 @@ export function createCastle(notes: Post[]): World {
     wall.receiveShadow = true
     scene.add(wall)
   }
-  for (const z of [0.3, -length - 0.3]) {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 2 + 1.2, HEIGHT, 0.6), stone)
-    wall.position.set(0, HEIGHT / 2, z)
-    scene.add(wall)
-  }
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 2 + 1.2, HEIGHT, 0.6), stone)
+  backWall.position.set(0, HEIGHT / 2, -length - 0.3)
+  scene.add(backWall)
 
   const torches: THREE.PointLight[] = []
   const flameMaterial = new THREE.MeshBasicMaterial({ color: '#ffb347' })
@@ -100,14 +102,7 @@ export function createCastle(notes: Post[]): World {
     action: { kind: 'new', isPrivate: true },
   })
 
-  const doorway = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.4, 3.6),
-    new THREE.MeshBasicMaterial({ color: '#f4f0dc' }),
-  )
-  doorway.position.set(0, 1.8, -0.01)
-  const daylight = new THREE.PointLight('#f4f0dc', 4, 8)
-  daylight.position.set(0, 2.5, -1)
-  scene.add(doorway, daylight)
+  scene.add(createGate(stone))
 
   return {
     name: 'castle',
@@ -128,4 +123,56 @@ export function createCastle(notes: Post[]): World {
     },
     dispose: () => disposeObject(scene),
   }
+}
+
+// The way out mirrors the gate seen from the forest: a short passage, the oak leaves swung open
+// into it, and daylight at the far end.
+function createGate(stone: THREE.Material) {
+  const gate = new THREE.Group()
+  const add = (mesh: THREE.Mesh, x: number, y: number, z: number) => {
+    mesh.position.set(x, y, z)
+    gate.add(mesh)
+  }
+  const sideWidth = HALF_WIDTH + 0.6 - GATE_HALF_WIDTH
+  for (const side of [-1, 1]) {
+    add(
+      new THREE.Mesh(new THREE.BoxGeometry(sideWidth, HEIGHT, GATE_DEPTH), stone),
+      side * (GATE_HALF_WIDTH + sideWidth / 2),
+      HEIGHT / 2,
+      GATE_DEPTH / 2,
+    )
+  }
+  add(
+    new THREE.Mesh(new THREE.BoxGeometry(GATE_HALF_WIDTH * 2, HEIGHT - DOOR_HEIGHT, GATE_DEPTH), stone),
+    0,
+    (HEIGHT + DOOR_HEIGHT) / 2,
+    GATE_DEPTH / 2,
+  )
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(GATE_HALF_WIDTH * 2, GATE_DEPTH),
+    new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9 }),
+  )
+  floor.rotation.x = -Math.PI / 2
+  add(floor, 0, 0, GATE_DEPTH / 2)
+
+  const leaves = new THREE.Group()
+  for (const side of [-1, 1] as const) {
+    const leaf = createDoorLeaf(side)
+    swingDoorLeaf(leaf, side, 1)
+    leaves.add(leaf)
+  }
+  leaves.position.z = GATE_DEPTH - 0.1
+  gate.add(leaves)
+
+  // Unfogged, so the way out still shines from the far end of the hall.
+  const daylight = new THREE.Mesh(
+    new THREE.PlaneGeometry(GATE_HALF_WIDTH * 2, DOOR_HEIGHT),
+    new THREE.MeshBasicMaterial({ color: '#f4f0dc', fog: false }),
+  )
+  daylight.rotation.y = Math.PI
+  add(daylight, 0, DOOR_HEIGHT / 2, GATE_DEPTH)
+  const light = new THREE.PointLight('#f4f0dc', 6, 10)
+  light.position.set(0, 2.5, GATE_DEPTH / 2)
+  gate.add(light)
+  return gate
 }

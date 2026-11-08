@@ -27,44 +27,15 @@ export class CastleDoor {
   readonly group = new THREE.Group()
   readonly targets: THREE.Object3D[]
 
-  private readonly leftPivot = new THREE.Group()
-  private readonly rightPivot = new THREE.Group()
+  private readonly leftPivot = createDoorLeaf(-1)
+  private readonly rightPivot = createDoorLeaf(1)
   private readonly plate: THREE.Mesh
   private readonly keyhole: THREE.Mesh
   private readonly slotContext: CanvasRenderingContext2D
   private readonly slotTexture: THREE.CanvasTexture
 
   constructor(open: boolean) {
-    const oak = new THREE.MeshStandardMaterial({
-      color: '#4b3320',
-      roughness: 0.85,
-      flatShading: true,
-    })
-    const iron = new THREE.MeshStandardMaterial({
-      color: '#2b2b2e',
-      metalness: 0.7,
-      roughness: 0.5,
-    })
-
-    for (const [pivot, side] of [
-      [this.leftPivot, -1],
-      [this.rightPivot, 1],
-    ] as const) {
-      pivot.position.x = side * DOOR_HALF_WIDTH
-      const leaf = new THREE.Mesh(
-        new THREE.BoxGeometry(DOOR_HALF_WIDTH, DOOR_HEIGHT, LEAF_THICKNESS),
-        oak,
-      )
-      leaf.position.set((-side * DOOR_HALF_WIDTH) / 2, DOOR_HEIGHT / 2, 0)
-      leaf.castShadow = leaf.receiveShadow = true
-      pivot.add(leaf)
-      for (const y of [0.7, 2.6, 3.9]) {
-        const band = new THREE.Mesh(new THREE.BoxGeometry(DOOR_HALF_WIDTH - 0.1, 0.1, 0.03), iron)
-        band.position.set((-side * DOOR_HALF_WIDTH) / 2, y, LEAF_THICKNESS / 2 + 0.01)
-        pivot.add(band)
-      }
-      this.group.add(pivot)
-    }
+    this.group.add(this.leftPivot, this.rightPivot)
 
     const canvas = document.createElement('canvas')
     canvas.width = SLOT_WIDTH
@@ -148,9 +119,32 @@ export class CastleDoor {
   }
 
   private setAngle(t: number) {
-    this.leftPivot.rotation.y = OPEN_ANGLE * t
-    this.rightPivot.rotation.y = -OPEN_ANGLE * t
+    swingDoorLeaf(this.leftPivot, -1, t)
+    swingDoorLeaf(this.rightPivot, 1, t)
   }
+}
+
+// One oak leaf with iron bands, hung from a pivot at its hinge edge; side -1 is the left leaf.
+export function createDoorLeaf(side: -1 | 1) {
+  const oak = new THREE.MeshStandardMaterial({ color: '#4b3320', roughness: 0.85, flatShading: true })
+  const iron = new THREE.MeshStandardMaterial({ color: '#2b2b2e', metalness: 0.7, roughness: 0.5 })
+  const pivot = new THREE.Group()
+  pivot.position.x = side * DOOR_HALF_WIDTH
+  const leaf = new THREE.Mesh(new THREE.BoxGeometry(DOOR_HALF_WIDTH, DOOR_HEIGHT, LEAF_THICKNESS), oak)
+  leaf.position.set((-side * DOOR_HALF_WIDTH) / 2, DOOR_HEIGHT / 2, 0)
+  leaf.castShadow = leaf.receiveShadow = true
+  pivot.add(leaf)
+  for (const y of [0.7, 2.6, 3.9]) {
+    const band = new THREE.Mesh(new THREE.BoxGeometry(DOOR_HALF_WIDTH - 0.1, 0.1, 0.03), iron)
+    band.position.set((-side * DOOR_HALF_WIDTH) / 2, y, LEAF_THICKNESS / 2 + 0.01)
+    pivot.add(band)
+  }
+  return pivot
+}
+
+// t runs from 0 (shut) to 1 (open); open leaves swing toward -z.
+export function swingDoorLeaf(pivot: THREE.Object3D, side: -1 | 1, t: number) {
+  pivot.rotation.y = -side * OPEN_ANGLE * t
 }
 
 function createKey() {
