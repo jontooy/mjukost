@@ -1,0 +1,2 @@
+# crontab of user pi on the Pi; install with: crontab /srv/mjukost/api/deploy/crontab
+* * * * * cd /srv/mjukost/api && php artisan schedule:run >> /dev/null 2>&1
