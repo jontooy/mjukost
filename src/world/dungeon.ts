@@ -44,8 +44,7 @@ interface Row {
   flames: THREE.Mesh[]
   eyes: THREE.Object3D[]
   torch: THREE.Vector3 | null
-  owned: THREE.Object3D[] // notes and desks, which own their materials
-  desks: Map<number, THREE.Object3D> // by slot
+  owned: THREE.Object3D[] // the notes and the desk, which own their materials
 }
 
 // Below the throne room: an endless corridor of cells, one for every private note, oldest first.
@@ -173,10 +172,6 @@ export function createDungeon(posts: Post[]): World {
     spawn: arrival,
     arrivals: { castle: arrival },
     interactables,
-    writingDesk(post) {
-      const slot = post ? notes.findIndex((note) => note.id === post.id) : notes.length
-      return slot < 0 ? undefined : rows.get(Math.floor(slot / 2))?.desks.get(slot)
-    },
     portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0.4), radius: 1.2, to: 'castle' }],
     clamp(position) {
       position.z = Math.min(position.z, -0.3)
@@ -207,7 +202,7 @@ export function createDungeon(posts: Post[]): World {
 
 // One row: a cell on each side, with bars toward the corridor. Static parts are merged per material.
 function buildRow(index: number, notes: Post[], m: Materials): Row {
-  const row: Row = { group: new THREE.Group(), interactables: [], flames: [], eyes: [], torch: null, owned: [], desks: new Map() }
+  const row: Row = { group: new THREE.Group(), interactables: [], flames: [], eyes: [], torch: null, owned: [] }
   const cells: THREE.Group[] = []
   const start = CELLS_START - index * CELL_LENGTH
   row.group.position.z = start
@@ -247,19 +242,13 @@ function buildRow(index: number, notes: Post[], m: Materials): Row {
       const blank = createBlankNote(m)
       blank.position.set(0, 2, 0.05)
       cell.add(blank)
-    }
-    // A desk in the corridor before every filled cell and the first empty one: the writing board
-    // stands there to edit that cell's note, or to write the next one.
-    if (slot <= notes.length) {
+      // The next note is written at a desk in the corridor, before its empty cell.
       const desk = createDesk('#3a2a1c')
       desk.position.set(side * (CORRIDOR_HALF_WIDTH - 0.7), 0, -CELL_LENGTH / 2)
       desk.rotation.y = -side * (Math.PI / 2)
       row.group.add(desk)
       row.owned.push(desk)
-      row.desks.set(slot, desk)
-      if (slot === notes.length) {
-        row.interactables.push({ object: desk, label: 'Write a note here', action: { kind: 'new', isPrivate: true } })
-      }
+      row.interactables.push({ object: desk, label: 'Write a note here', action: { kind: 'new', isPrivate: true } })
     } else {
       const decor = DECOR[Math.floor(random() * DECOR.length)]!
       const eyes = furnishCell(cell, decor, m, random)

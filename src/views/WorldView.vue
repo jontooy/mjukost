@@ -18,21 +18,8 @@ import { EYE_HEIGHT, Engine, type Portal, type WorldName } from '@/world/engine'
 import { createForest } from '@/world/forest'
 import { createDungeon } from '@/world/dungeon'
 import type { Field } from '@/world/paperCanvas'
-import { WritingBoard, type BoardItem } from '@/world/writingBoard'
 
 type Mode = 'walk' | 'read' | 'write' | 'door'
-
-interface Photo {
-  alt: string
-  url: string
-}
-
-interface WriteSession {
-  board: WritingBoard
-  post: Post | null
-  isPrivate: boolean
-  photos: Photo[]
-}
 
 interface Hover {
   label: string
@@ -52,7 +39,6 @@ interface SavedPosition {
 
 const PORTAL_PUSHBACK = 1.5
 const CAMERA_SECONDS = 0.9
-const IMAGE_PATTERN = /!\[([^\]]*)\]\(([^)\s]+)\)/g
 const POSITION_KEY = 'mjukost-position'
 
 const auth = useAuthStore()
@@ -74,6 +60,8 @@ const locked = ref(false)
 const focusLabel = ref<string | null>(null)
 const hover = ref<Hover | null>(null)
 const reading = ref<{ post: Post; html: string } | null>(null)
+const writing = ref<{ post: Post | null; isPrivate: boolean } | null>(null)
+const preview = ref('')
 const busy = ref(false)
 const readError = ref('')
 const joystick = reactive({ active: false, originX: 0, originY: 0, x: 0, y: 0 })
@@ -90,7 +78,6 @@ const status = reactive({ text: '', isError: false })
 let engine: Engine
 let controls: FirstPersonControls
 let travelling = false
-let session: WriteSession | null = null
 let returnTo: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null = null
 let lastDrawn = ''
 const pointer = new THREE.Vector2()
@@ -145,35 +132,20 @@ function fieldOf(
 }
 
 function drawFocusSurface() {
+  const door = engine.world?.door
+  if (mode.value !== 'door' || !door) return
   const caretOn = Math.floor(performance.now() / 530) % 2 === 0
-  if (mode.value === 'write' && session) {
-    const title = fieldOf(titleInput.value, form.title, caretOn)
-    const body = fieldOf(bodyInput.value, form.body, caretOn)
-    const heading = `${session.post ? 'Editing' : 'A new'} ${session.isPrivate ? 'note' : 'post'}`
-    const key = JSON.stringify([heading, title, body, status])
-    if (key === lastDrawn) return
-    lastDrawn = key
-    session.board.render({
-      heading,
-      title,
-      body,
-      status: status.text,
-      statusIsError: status.isError,
-    })
-    session.board.setPhotos(session.photos.map((photo) => photo.url))
-  } else if (mode.value === 'door' && engine.world?.door) {
-    const email = fieldOf(emailInput.value, form.email, caretOn)
-    const password = fieldOf(passwordInput.value, form.password, caretOn)
-    const key = JSON.stringify([email, password, status])
-    if (key === lastDrawn) return
-    lastDrawn = key
-    engine.world.door.render({
-      email,
-      password,
-      status: status.text,
-      statusIsError: status.isError,
-    })
-  }
+  const email = fieldOf(emailInput.value, form.email, caretOn)
+  const password = fieldOf(passwordInput.value, form.password, caretOn)
+  const key = JSON.stringify([email, password, status])
+  if (key === lastDrawn) return
+  lastDrawn = key
+  door.render({
+    email,
+    password,
+    status: status.text,
+    statusIsError: status.isError,
+  })
 }
 
 function onFrame(dt: number) {
@@ -249,43 +221,32 @@ async function leaveFocus() {
   controls.enabled = true
 }
 
-function splitBody(body: string) {
-  const photos = [...body.matchAll(IMAGE_PATTERN)].map((match) => ({
-    alt: match[1]!,
-    url: match[2]!,
-  }))
-  const text = body
-    .replace(IMAGE_PATTERN, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-  return { text, photos }
+// Renders a note's markdown exactly as the read view shows it, private images included.
+async function renderMarkdown(body: string) {
+  const resolved = await resolvePrivateMarkdownUrls(body)
+  return DOMPurify.sanitize(marked.parse(resolved, { async: false }) as string)
 }
 
-async function startWriting(isPrivate: boolean, post: Post | null) {
-  const world = engine.world
-  const desk = world?.writingDesk?.(post)
-  if (!world || !desk) return
+function startWriting(isPrivate: boolean, post: Post | null) {
   reading.value = null
-  const board = new WritingBoard(
-    desk,
-    post ? 'Seal the changes' : isPrivate ? 'Seal the note' : 'Seal and publish',
-  )
-  world.scene.add(board.group)
-  const { text, photos } = splitBody(post?.body ?? '')
   form.title = post?.title ?? ''
-  form.body = text
-  session = { board, post, isPrivate, photos }
-  await focusOn('write', board.view(engine.camera.aspect))
-  if (!isTouch) focusInput(titleInput.value)
+  form.body = post?.body ?? ''
+  preview.value = ''
+  setStatus('')
+  writing.value = { post, isPrivate }
+  mode.value = 'write'
+  controls.enabled = false
+  controls.unlock()
+  engine.centerPick = false
+  if (!isTouch) void nextTick(() => focusInput(titleInput.value))
 }
 
-async function endWriting() {
-  if (!session) return
-  const { board } = session
-  session = null
-  board.mirror.stop()
-  await leaveFocus()
-  board.dispose()
+function endWriting() {
+  ;(document.activeElement as HTMLElement | null)?.blur()
+  writing.value = null
+  mode.value = 'walk'
+  engine.centerPick = true
+  controls.enabled = true
 }
 
 function focusInput(input: HTMLInputElement | HTMLTextAreaElement | null) {
@@ -294,58 +255,55 @@ function focusInput(input: HTMLInputElement | HTMLTextAreaElement | null) {
   input.setSelectionRange(input.value.length, input.value.length)
 }
 
-async function pinPhoto(file: File) {
-  if (!session) return
-  const active = session
-  setStatus('Pinning the photo…')
-  try {
-    const url = await uploadPostImage(file, { isPrivate: active.isPrivate })
-    const alt = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
-    active.photos.push({ alt, url })
-    setStatus('')
-  } catch (error) {
-    setStatus(errorText(error, 'The photo would not pin'), true)
-  }
-}
-
-async function useMirror() {
-  if (!session || busy.value) return
-  const { board } = session
+// Uploads images and inserts them into the text where the cursor is, as the preview shows them.
+// Only private notes, in the dungeon, take images.
+async function addImages(files: File[]) {
+  const active = writing.value
+  const input = bodyInput.value
+  if (!active?.isPrivate || !input || busy.value || files.length === 0) return
+  const start = input.selectionStart
+  const end = input.selectionEnd
   busy.value = true
+  setStatus(files.length > 1 ? 'Adding the images…' : 'Adding the image…')
   try {
-    if (!board.mirror.live) {
-      setStatus('Looking into the mirror…')
-      await board.liftMirror(engine, engine.camera.aspect)
-      await board.mirror.start()
-      board.showFlip()
-      setStatus('')
-      return
+    const images: string[] = []
+    for (const file of files) {
+      const url = await uploadPostImage(file, { isPrivate: true })
+      const alt = file.name.replace(/\.[^.]+$/, '').replace(/[[\]_-]+/g, ' ').trim()
+      images.push(`![${alt}](${url})`)
     }
-    const file = await board.mirror.capture()
-    board.mirror.stop()
-    await board.lowerMirror(engine)
-    await pinPhoto(file)
+    const inserted = images.join(' ')
+    form.body = form.body.slice(0, start) + inserted + form.body.slice(end)
+    setStatus('')
+    await nextTick()
+    const caret = start + inserted.length
+    input.focus({ preventScroll: true })
+    input.setSelectionRange(caret, caret)
   } catch (error) {
-    board.mirror.stop()
-    await board.lowerMirror(engine)
-    setStatus(errorText(error, 'The mirror stayed dark'), true)
+    setStatus(errorText(error, 'The image could not be added'), true)
   } finally {
     busy.value = false
   }
 }
 
+function onPaste(event: ClipboardEvent) {
+  if (!writing.value?.isPrivate) return
+  const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'))
+  if (files.length === 0) return
+  event.preventDefault()
+  void addImages(files)
+}
+
 async function seal() {
-  if (!session || busy.value) return
-  const active = session
+  const active = writing.value
+  if (!active || busy.value) return
   const title = form.title.trim()
   if (!title) {
     setStatus('The title is still empty', true)
     focusInput(titleInput.value)
     return
   }
-  const body = [form.body.trim(), ...active.photos.map((photo) => `![${photo.alt}](${photo.url})`)]
-    .filter(Boolean)
-    .join('\n\n')
+  const body = form.body.trim()
   busy.value = true
   setStatus('Sealing…')
   try {
@@ -354,38 +312,12 @@ async function seal() {
     } else {
       await createPost({ title, body, is_private: active.isPrivate })
     }
-    await endWriting()
+    endWriting()
     await rebuild()
   } catch (error) {
     setStatus(errorText(error, 'The seal would not set'), true)
   } finally {
     busy.value = false
-  }
-}
-
-function onBoardItem(item: BoardItem) {
-  if (!session) return
-  switch (item.kind) {
-    case 'title':
-      return focusInput(titleInput.value)
-    case 'body':
-      return focusInput(bodyInput.value)
-    case 'photos':
-      return fileInput.value?.click()
-    case 'photo':
-      session.photos.splice(item.index, 1)
-      lastDrawn = ''
-      return
-    case 'mirror':
-      return void useMirror()
-    case 'flip':
-      return void session.board.mirror
-        .flip()
-        .catch((error) => setStatus(errorText(error, 'The mirror would not turn'), true))
-    case 'seal':
-      return void seal()
-    case 'leave':
-      return void endWriting()
   }
 }
 
@@ -442,17 +374,10 @@ function onDoorItem(item: DoorItem) {
 }
 
 function pickFocused() {
-  if (travelling || busy.value) return null
-  if (mode.value === 'write' && session) {
-    const pick = engine.pickAt(pointer, session.board.targets)
-    return pick ? session.board.itemAt(pick) : null
-  }
   const door = engine.world?.door
-  if (mode.value === 'door' && door) {
-    const pick = engine.pickAt(pointer, door.targets)
-    return pick ? door.itemAt(pick) : null
-  }
-  return null
+  if (travelling || busy.value || mode.value !== 'door' || !door) return null
+  const pick = engine.pickAt(pointer, door.targets)
+  return pick ? door.itemAt(pick) : null
 }
 
 function updatePointer(event: PointerEvent | MouseEvent) {
@@ -464,32 +389,30 @@ function updatePointer(event: PointerEvent | MouseEvent) {
 }
 
 function onPointerMove(event: PointerEvent) {
-  if (mode.value !== 'write' && mode.value !== 'door') return
+  if (mode.value !== 'door') return
   updatePointer(event)
   const found = pickFocused()
   hover.value = found ? { label: found.label, x: event.clientX, y: event.clientY } : null
 }
 
 function onCanvasClick(event: MouseEvent) {
-  if (mode.value !== 'write' && mode.value !== 'door') return
+  if (mode.value !== 'door') return
   updatePointer(event)
   const found = pickFocused()
-  if (!found) return
-  if (mode.value === 'write') onBoardItem(found.item as BoardItem)
-  else onDoorItem(found.item as DoorItem)
+  if (found) onDoorItem(found.item)
 }
 
 function stepBack() {
   if (busy.value) return
-  if (mode.value === 'write') void endWriting()
+  if (mode.value === 'write') endWriting()
   else if (mode.value === 'door') void leaveFocus()
 }
 
 async function onFileChosen(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  const files = [...(input.files ?? [])]
   input.value = ''
-  if (file) await pinPhoto(file)
+  await addImages(files)
 }
 
 function openRead(post: Post, html: string) {
@@ -509,19 +432,13 @@ function closeRead() {
 async function interact() {
   const action = engine.focused?.action
   if (!action || mode.value !== 'walk') return
-  if (action.kind === 'new') {
-    await startWriting(action.isPrivate, null)
-    return
-  }
-  const resolved = await resolvePrivateMarkdownUrls(action.post.body)
-  openRead(action.post, DOMPurify.sanitize(marked.parse(resolved, { async: false }) as string))
+  if (action.kind === 'new') return startWriting(action.isPrivate, null)
+  openRead(action.post, await renderMarkdown(action.post.body))
 }
 
-async function editReading() {
+function editReading() {
   const post = reading.value?.post
-  if (!post) return
-  mode.value = 'walk'
-  await startWriting(post.is_private, post)
+  if (post) startWriting(post.is_private, post)
 }
 
 async function onDelete(post: Post) {
@@ -540,7 +457,7 @@ async function onDelete(post: Post) {
 }
 
 async function onSignOut() {
-  if (session) await endWriting()
+  if (writing.value) endWriting()
   if (consoleOpen.value) closeConsole()
   flying.value = false
   await auth.signOut()
@@ -572,7 +489,7 @@ async function teleportToSpawn() {
   controls.syncFromCamera()
 }
 
-// While focused on the desk or door, the camera is posed; save where the player stood instead.
+// While focused on the door, the camera is posed; save where the player stood instead.
 function savePosition() {
   if (!engine.world) return
   const position = returnTo?.position ?? engine.camera.position
@@ -707,6 +624,20 @@ watch(worldName, (name) => {
 
 watch(flying, (on) => (controls.flying = on))
 
+// The preview follows the text after a short pause, so private image links are not signed per keystroke.
+let previewTimer = 0
+watch(
+  () => (writing.value ? form.body : null),
+  (body) => {
+    clearTimeout(previewTimer)
+    if (body === null) return
+    previewTimer = window.setTimeout(async () => {
+      const html = await renderMarkdown(body)
+      if (writing.value && form.body === body) preview.value = html
+    }, 300)
+  },
+)
+
 onMounted(() => {
   engine = new Engine(canvasEl.value!)
   controls = new FirstPersonControls(engine, canvasEl.value!)
@@ -721,7 +652,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('pagehide', savePosition)
-  session?.board.dispose()
   controls.dispose()
   engine.dispose()
   document.documentElement.classList.remove('private-mode')
@@ -738,20 +668,6 @@ onBeforeUnmount(() => {
       @click="onCanvasClick"
     />
 
-    <input
-      ref="titleInput"
-      v-model="form.title"
-      class="pointer-events-none fixed top-0 left-0 size-px opacity-0"
-      aria-label="Title"
-      maxlength="200"
-      @keydown.enter.prevent="focusInput(bodyInput)"
-    />
-    <textarea
-      ref="bodyInput"
-      v-model="form.body"
-      class="pointer-events-none fixed top-0 left-0 size-px opacity-0"
-      aria-label="Text"
-    />
     <input
       ref="emailInput"
       v-model="form.email"
@@ -773,7 +689,7 @@ onBeforeUnmount(() => {
       aria-label="Password"
       @keydown.enter.prevent="turnKey"
     />
-    <input ref="fileInput" class="hidden" type="file" accept="image/*" @change="onFileChosen" />
+    <input ref="fileInput" class="hidden" type="file" accept="image/*" multiple @change="onFileChosen" />
 
     <div
       v-if="mode === 'walk'"
@@ -795,7 +711,7 @@ onBeforeUnmount(() => {
       <div class="ml-auto flex gap-2">
         <MusicPlayer />
         <button
-          v-if="mode === 'write' || mode === 'door'"
+          v-if="mode === 'door'"
           type="button"
           class="min-h-11 cursor-pointer rounded-[0.35rem] border border-white/40 bg-black/40 px-3 text-[0.85rem] text-white"
           @click="stepBack"
@@ -930,7 +846,7 @@ onBeforeUnmount(() => {
             class="min-h-11 cursor-pointer rounded-[0.35rem] border border-border bg-surface px-3 text-[0.85rem] text-ink"
             @click="editReading"
           >
-            Edit at the desk
+            Edit
           </button>
           <button
             type="button"
@@ -943,6 +859,90 @@ onBeforeUnmount(() => {
         </div>
         <p v-if="readError" class="mt-3 text-[0.9rem] text-danger" role="alert">
           {{ readError }}
+        </p>
+      </section>
+    </div>
+
+    <div v-if="writing" class="absolute inset-0 grid place-items-center bg-black/50 p-3">
+      <section
+        class="max-h-[90vh] w-full max-w-[40rem] overflow-y-auto rounded-md border border-border bg-page p-5 text-ink shadow-2xl"
+        aria-label="Writer"
+      >
+        <div class="mb-3 flex items-center justify-between gap-4">
+          <p class="m-0 text-[0.85rem] text-subtle">
+            {{ writing.post ? 'Editing' : 'A new' }} {{ writing.isPrivate ? 'note' : 'post' }}
+          </p>
+          <button
+            type="button"
+            class="min-h-11 shrink-0 cursor-pointer border-0 bg-transparent px-2 text-xl text-muted"
+            aria-label="Close"
+            :disabled="busy"
+            @click="stepBack"
+          >
+            ✕
+          </button>
+        </div>
+        <input
+          ref="titleInput"
+          v-model="form.title"
+          class="block w-full rounded-[0.35rem] border border-border bg-surface px-3 py-2 text-lg text-ink"
+          aria-label="Title"
+          placeholder="Title"
+          maxlength="200"
+          @keydown.enter.prevent="focusInput(bodyInput)"
+        />
+        <textarea
+          ref="bodyInput"
+          v-model="form.body"
+          class="mt-3 block min-h-40 w-full resize-y rounded-[0.35rem] border border-border bg-surface px-3 py-2 text-ink"
+          aria-label="Text"
+          placeholder="Write here…"
+          :readonly="busy"
+          @paste="onPaste"
+        />
+        <div v-if="writing.isPrivate" class="mt-2 flex items-center gap-3 text-[0.85rem] text-subtle">
+          <button
+            type="button"
+            class="min-h-11 cursor-pointer rounded-[0.35rem] border border-border bg-surface px-3 text-[0.85rem] text-ink disabled:opacity-60"
+            :disabled="busy"
+            @click="fileInput?.click()"
+          >
+            Add image
+          </button>
+          <span>or paste one into the text, where the cursor is</span>
+        </div>
+
+        <p class="mt-5 mb-2 text-[0.85rem] text-subtle">Preview</p>
+        <div class="rounded-[0.35rem] border border-border p-4">
+          <h1 class="m-0 text-xl font-normal break-words sm:text-2xl">{{ form.title || 'Untitled' }}</h1>
+          <div class="post-body mt-3" v-html="preview" />
+        </div>
+
+        <div class="mt-5 flex items-center gap-3">
+          <button
+            type="button"
+            class="min-h-11 cursor-pointer rounded-[0.35rem] border border-border bg-surface px-3 text-[0.85rem] text-ink disabled:opacity-60"
+            :disabled="busy"
+            @click="seal"
+          >
+            {{ writing.post ? 'Seal the changes' : writing.isPrivate ? 'Seal the note' : 'Seal and publish' }}
+          </button>
+          <button
+            type="button"
+            class="min-h-11 cursor-pointer rounded-[0.35rem] border border-border bg-surface px-3 text-[0.85rem] text-ink disabled:opacity-60"
+            :disabled="busy"
+            @click="stepBack"
+          >
+            Cancel
+          </button>
+        </div>
+        <p
+          v-if="status.text"
+          class="mt-3 mb-0 text-[0.9rem]"
+          :class="status.isError ? 'text-danger' : 'text-subtle'"
+          :role="status.isError ? 'alert' : 'status'"
+        >
+          {{ status.text }}
         </p>
       </section>
     </div>

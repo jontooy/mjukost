@@ -31,8 +31,6 @@ export interface World {
   interactables: Interactable[]
   door?: CastleDoor
   portals: Portal[]
-  // Where the writing board stands for a new note (post null) or for editing one.
-  writingDesk?(post: Post | null): THREE.Object3D | undefined
   clamp(position: THREE.Vector3): void
   update?(dt: number, elapsed: number, viewer: THREE.Vector3): void
   dispose(): void

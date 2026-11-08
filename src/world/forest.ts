@@ -106,8 +106,8 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
     interactables.push({ object: painting, label: post.title, action: { kind: 'read', post } })
   })
 
-  const desk = options.signedIn ? createDesk('#5a4128') : undefined
-  if (desk) {
+  if (options.signedIn) {
+    const desk = createDesk('#5a4128')
     desk.position.set(2.2, 0, pathStart + 4)
     desk.rotation.y = -Math.PI / 2
     scene.add(desk)
@@ -129,7 +129,6 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
     spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, pathStart + 8), yaw: 0 },
     arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI } },
     interactables,
-    writingDesk: () => desk,
     portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0.75), radius: 1.3, to: 'castle' }],
     clamp(position) {
       pushOutOfCastle(position)
