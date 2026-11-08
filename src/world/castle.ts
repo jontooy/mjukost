@@ -153,8 +153,12 @@ export function createCastle(options: { signedIn: boolean }): World {
   return {
     name: 'castle',
     scene,
-    spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, -3), yaw: 0 },
-    arrivals: { dungeon: { position: new THREE.Vector3(DUNGEON_DOOR_X, EYE_HEIGHT, -LENGTH + 3), yaw: Math.PI } },
+    // A signed-in visitor starts at the foot of the dais, facing the throne.
+    spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, daisFront + 3), yaw: 0 },
+    arrivals: {
+      forest: { position: new THREE.Vector3(0, EYE_HEIGHT, -3), yaw: 0 },
+      dungeon: { position: new THREE.Vector3(DUNGEON_DOOR_X, EYE_HEIGHT, -LENGTH + 3), yaw: Math.PI },
+    },
     interactables: [],
     door: dungeonDoor.door,
     portals: [

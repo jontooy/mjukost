@@ -510,9 +510,12 @@ function savePosition() {
   sessionStorage.setItem(POSITION_KEY, JSON.stringify(saved))
 }
 
+// A fresh visit starts in the forest, or before the throne for a signed-in visitor.
 async function restorePosition() {
   const saved = JSON.parse(sessionStorage.getItem(POSITION_KEY) ?? 'null') as SavedPosition | null
-  if (!saved || (saved.world === 'dungeon' && !auth.isAuthenticated)) return enter('forest')
+  if (!saved || (saved.world === 'dungeon' && !auth.isAuthenticated)) {
+    return enter(auth.isAuthenticated ? 'castle' : 'forest')
+  }
   await enter(saved.world)
   if (loadError.value) return
   engine.camera.position.set(saved.x, saved.y, saved.z)
