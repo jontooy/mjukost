@@ -91,6 +91,21 @@ class PostTest extends TestCase
         $this->assertModelMissing($post);
     }
 
+    public function test_a_post_needs_text_but_no_title(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/posts', ['body' => 'Only text', 'is_private' => false, 'slot' => 0])
+            ->assertCreated()
+            ->assertJsonPath('title', '');
+        $this->postJson('/api/posts', ['title' => '', 'body' => 'Text', 'is_private' => false, 'slot' => 1])
+            ->assertCreated()
+            ->assertJsonPath('title', '');
+        $this->postJson('/api/posts', ['title' => 'T', 'body' => '', 'is_private' => false, 'slot' => 2])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('body');
+    }
+
     public function test_title_longer_than_200_characters_is_rejected(): void
     {
         Sanctum::actingAs(User::factory()->create());

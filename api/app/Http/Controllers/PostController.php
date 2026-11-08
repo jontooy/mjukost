@@ -69,14 +69,19 @@ class PostController extends Controller
     }
 
     /**
+     * The title may be left out; the text may not.
+     *
      * @return array{title: string, body: string, is_private: bool}
      */
     private function validatedPost(Request $request): array
     {
-        return $request->validate([
-            'title' => ['required', 'string', 'max:200'],
+        $data = $request->validate([
+            'title' => ['nullable', 'string', 'max:200'],
             'body' => ['required', 'string'],
             'is_private' => ['required', 'boolean'],
         ]);
+        $data['title'] ??= '';
+
+        return $data;
     }
 }
