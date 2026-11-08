@@ -16,6 +16,7 @@ import { FirstPersonControls } from '@/world/controls'
 import type { DoorItem } from '@/world/door'
 import { EYE_HEIGHT, Engine, type Portal, type WorldName } from '@/world/engine'
 import { createForest } from '@/world/forest'
+import { createDungeon } from '@/world/dungeon'
 import type { Field } from '@/world/paperCanvas'
 import { WritingBoard, type BoardItem } from '@/world/writingBoard'
 
@@ -99,13 +100,13 @@ async function enter(name: WorldName, from?: WorldName) {
   loading.value = true
   loadError.value = false
   try {
-    const posts = await listPosts({ isPrivate: name === 'castle' })
-    engine.setWorld(
-      name === 'castle'
-        ? createCastle(posts)
-        : createForest(posts, { signedIn: auth.isAuthenticated }),
-      from,
-    )
+    const world =
+      name === 'dungeon'
+        ? createDungeon()
+        : name === 'castle'
+          ? createCastle(await listPosts({ isPrivate: true }))
+          : createForest(await listPosts({ isPrivate: false }), { signedIn: auth.isAuthenticated })
+    engine.setWorld(world, from)
     controls.syncFromCamera()
     worldName.value = name
   } catch {
@@ -544,7 +545,7 @@ async function onSignOut() {
   flying.value = false
   await auth.signOut()
   closeRead()
-  await enter('forest', worldName.value === 'castle' ? 'castle' : undefined)
+  await enter('forest', worldName.value === 'forest' ? undefined : 'castle')
 }
 
 function openConsole() {
@@ -591,7 +592,7 @@ function savePosition() {
 
 async function restorePosition() {
   const saved = JSON.parse(sessionStorage.getItem(POSITION_KEY) ?? 'null') as SavedPosition | null
-  if (!saved || (saved.world === 'castle' && !auth.isAuthenticated)) return enter('forest')
+  if (!saved || (saved.world !== 'forest' && !auth.isAuthenticated)) return enter('forest')
   await enter(saved.world)
   if (loadError.value) return
   engine.camera.position.set(saved.x, saved.y, saved.z)
@@ -698,7 +699,7 @@ function onKeyDown(event: KeyboardEvent) {
 }
 
 watch(worldName, (name) => {
-  document.documentElement.classList.toggle('private-mode', name === 'castle')
+  document.documentElement.classList.toggle('private-mode', name !== 'forest')
   music.applyWorldPreset(name)
 })
 
@@ -781,6 +782,9 @@ onBeforeUnmount(() => {
       <div class="flex flex-col gap-1">
         <p v-if="worldName === 'castle'" class="m-0 font-serif text-lg tracking-wide drop-shadow">
           The castle of notes
+        </p>
+        <p v-if="worldName === 'dungeon'" class="m-0 font-serif text-lg tracking-wide drop-shadow">
+          The dungeon
         </p>
         <p v-if="consoleOpen" class="m-0 w-fit bg-black/50 px-2 py-0.5 font-mono text-[0.95rem]">
           {{ coordinates }}

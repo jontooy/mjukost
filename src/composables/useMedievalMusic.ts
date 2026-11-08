@@ -8,6 +8,7 @@ const VOLUME = 0.5
 const WORLD_PRESETS: Record<WorldName, Omit<EngineSettings, 'seed'> & { reverbWet: number }> = {
   forest: { mode: 'dorian', danceForm: 'estampie', tempo: 132, reverbWet: 0.25 },
   castle: { mode: 'phrygian', danceForm: 'slowAir', tempo: 72, reverbWet: 0.5 },
+  dungeon: { mode: 'phrygian', danceForm: 'slowAir', tempo: 52, reverbWet: 0.75 },
 }
 
 // Off unless the visitor turned it on before; the choice survives a refresh.

@@ -4,7 +4,7 @@ import type { CastleDoor } from '@/world/door'
 
 export type WorldAction = { kind: 'read'; post: Post } | { kind: 'new'; isPrivate: boolean }
 
-export type WorldName = 'forest' | 'castle'
+export type WorldName = 'forest' | 'castle' | 'dungeon'
 
 export interface Interactable {
   object: THREE.Object3D
