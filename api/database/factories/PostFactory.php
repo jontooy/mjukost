@@ -18,6 +18,7 @@ class PostFactory extends Factory
             'title' => fake()->sentence(),
             'body' => fake()->paragraph(),
             'is_private' => false,
+            'slot' => fake()->unique()->numberBetween(0, Post::MAX_SLOT),
         ];
     }
 

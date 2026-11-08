@@ -43,7 +43,7 @@ class PostTest extends TestCase
         Post::factory()->create();
 
         $this->assertEqualsCanonicalizing(
-            ['id', 'user_id', 'title', 'body', 'is_private', 'created_at', 'updated_at'],
+            ['id', 'user_id', 'title', 'body', 'is_private', 'slot', 'created_at', 'updated_at'],
             array_keys($this->getJson('/api/posts')->json('0')),
         );
     }
@@ -63,11 +63,12 @@ class PostTest extends TestCase
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
-        $this->postJson('/api/posts', ['title' => 'Hello', 'body' => 'World', 'is_private' => true, 'user_id' => (string) Str::uuid()])
+        $this->postJson('/api/posts', ['title' => 'Hello', 'body' => 'World', 'is_private' => true, 'slot' => 0, 'user_id' => (string) Str::uuid()])
             ->assertCreated()
             ->assertJsonPath('user_id', $user->id)
             ->assertJsonPath('title', 'Hello')
-            ->assertJsonPath('is_private', true);
+            ->assertJsonPath('is_private', true)
+            ->assertJsonPath('slot', 0);
     }
 
     public function test_any_signed_in_user_can_update_a_post(): void
@@ -97,6 +98,39 @@ class PostTest extends TestCase
         $this->postJson('/api/posts', ['title' => str_repeat('a', 201), 'body' => 'B', 'is_private' => false])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('title');
+    }
+
+    public function test_a_place_takes_one_post_per_side(): void
+    {
+        Post::factory()->create(['slot' => 3]);
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/posts', ['title' => 'T', 'body' => 'B', 'is_private' => false, 'slot' => 3])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('slot');
+        $this->postJson('/api/posts', ['title' => 'T', 'body' => 'B', 'is_private' => false])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('slot');
+        $this->postJson('/api/posts', ['title' => 'T', 'body' => 'B', 'is_private' => true, 'slot' => 3])
+            ->assertCreated()
+            ->assertJsonPath('slot', 3);
+        $this->postJson('/api/posts', ['title' => 'T', 'body' => 'B', 'is_private' => false, 'slot' => 4])
+            ->assertCreated();
+    }
+
+    public function test_moving_a_post_to_the_other_side_needs_its_place_free_there(): void
+    {
+        $public = Post::factory()->create(['slot' => 5]);
+        Post::factory()->private()->create(['slot' => 5]);
+        $free = Post::factory()->create(['slot' => 6]);
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->putJson("/api/posts/{$public->id}", ['title' => 'T', 'body' => 'B', 'is_private' => true])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('is_private');
+        $this->putJson("/api/posts/{$free->id}", ['title' => 'T', 'body' => 'B', 'is_private' => true])
+            ->assertOk()
+            ->assertJsonPath('slot', 6);
     }
 
     public function test_malformed_post_id_is_not_found(): void

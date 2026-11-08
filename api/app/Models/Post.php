@@ -9,9 +9,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['title', 'body', 'is_private'])]
+// A post's slot is its place in the world: a poster along the road for public posts, a cell in
+// the dungeon for private ones. Slots are unique among public posts and among private posts.
+#[Fillable(['title', 'body', 'is_private', 'slot'])]
 class Post extends Model
 {
+    public const MAX_SLOT = 10_000_000;
+
     /** @use HasFactory<PostFactory> */
     use HasFactory, HasUuids;
 
@@ -20,7 +24,7 @@ class Post extends Model
      */
     protected function casts(): array
     {
-        return ['is_private' => 'boolean'];
+        return ['is_private' => 'boolean', 'slot' => 'integer'];
     }
 
     /**
