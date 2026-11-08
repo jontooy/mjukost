@@ -661,7 +661,7 @@ const COMMANDS: ConsoleCommand[] = [
         consoleMessage.value = 'Usage: /music [on|off]'
         return
       }
-      if (args === 'on') void music.play()
+      if (args === 'on') music.play()
       else if (args === 'off') music.stop()
       else music.toggle()
       closeConsole()
