@@ -75,10 +75,6 @@ export class MedievalEngine {
     if (this.running) this.pending = { ...settings }
   }
 
-  setVolume(volume: number): void {
-    this.master.gain.rampTo(volume, 0.05)
-  }
-
   setReverbWet(wet: number): void {
     this.reverb.wet.rampTo(wet, 1)
   }
