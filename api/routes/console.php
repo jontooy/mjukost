@@ -71,3 +71,4 @@ Artisan::command('mjukost:prune-images {--dry-run : List orphaned images without
 })->purpose('Delete uploaded images that no post links to any more');
 
 Schedule::command('mjukost:prune-images')->dailyAt('03:30');
+Schedule::command('sanctum:prune-expired --hours=24')->dailyAt('03:40');

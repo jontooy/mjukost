@@ -54,4 +54,16 @@ class AuthTest extends TestCase
 
         $this->withToken($token)->getJson('/api/user')->assertUnauthorized();
     }
+
+    public function test_tokens_expire_after_30_days(): void
+    {
+        $token = User::factory()->create()->createToken('web')->plainTextToken;
+
+        $this->travel(29)->days();
+        $this->withToken($token)->getJson('/api/user')->assertOk();
+        $this->app['auth']->forgetGuards();
+
+        $this->travel(2)->days();
+        $this->withToken($token)->getJson('/api/user')->assertUnauthorized();
+    }
 }
