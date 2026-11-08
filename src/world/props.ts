@@ -47,49 +47,15 @@ export function createDesk(woodColor: THREE.ColorRepresentation) {
     new THREE.ConeGeometry(0.03, 0.45, 5),
     new THREE.MeshStandardMaterial({ color: '#f5f5f0', emissive: '#443322' }),
   )
-  quill.position.set(0.4, 1.25, 0)
-  quill.rotation.z = -0.5
+  quill.position.set(0.05, 1.04, -0.15)
+  quill.rotation.set(-0.3, 0.3, Math.PI / 2)
   group.add(top, leg, paper, quill)
   group.traverse((node) => (node.castShadow = true))
   return group
 }
 
-export function createPortalSurface(
-  color: THREE.ColorRepresentation,
-  width: number,
-  height: number,
-) {
-  const material = new THREE.ShaderMaterial({
-    transparent: true,
-    side: THREE.DoubleSide,
-    uniforms: { time: { value: 0 }, color: { value: new THREE.Color(color) } },
-    vertexShader: /* glsl */ `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform float time;
-      uniform vec3 color;
-      varying vec2 vUv;
-      void main() {
-        vec2 p = vUv - 0.5;
-        float r = length(p * vec2(1.0, 0.7));
-        float a = atan(p.y, p.x);
-        float swirl = sin(a * 5.0 + r * 18.0 - time * 2.5) * 0.5 + 0.5;
-        float glow = smoothstep(0.55, 0.0, r);
-        gl_FragColor = vec4(color * (0.6 + swirl * 0.8), glow * (0.55 + swirl * 0.45));
-      }
-    `,
-  })
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material)
-  return { mesh, tick: (elapsed: number) => (material.uniforms.time!.value = elapsed) }
-}
-
-export function disposeScene(scene: THREE.Scene) {
-  scene.traverse((node) => {
+export function disposeObject(root: THREE.Object3D) {
+  root.traverse((node) => {
     if (!(node instanceof THREE.Mesh || node instanceof THREE.InstancedMesh)) return
     node.geometry.dispose()
     const materials = Array.isArray(node.material) ? node.material : [node.material]

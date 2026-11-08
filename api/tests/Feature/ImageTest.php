@@ -61,7 +61,9 @@ class ImageTest extends TestCase
             ->json('urls');
 
         $this->assertSame([$path], array_keys($urls));
-        $this->get($urls[$path])->assertOk();
+        $this->get($urls[$path], ['Origin' => 'https://privat.bahnhof.se'])
+            ->assertOk()
+            ->assertHeader('Access-Control-Allow-Origin', 'https://privat.bahnhof.se');
         $this->get('/storage/private-images/'.$path)->assertForbidden();
 
         $this->travel(61)->minutes();

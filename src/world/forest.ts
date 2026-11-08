@@ -1,13 +1,8 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
+import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
-import {
-  createDesk,
-  createPainting,
-  createPortalSurface,
-  disposeScene,
-  seededRandom,
-} from '@/world/props'
+import { createDesk, createPainting, disposeObject, seededRandom } from '@/world/props'
 
 const FOG_COLOR = '#9aa58c'
 const PAINTING_SPACING = 2.4
@@ -15,7 +10,7 @@ const PATH_EDGE = 2.6
 const TREE_COUNT = 420
 const FIREFLY_COUNT = 120
 
-export function createForest(posts: Post[], options: { canWrite: boolean }): World {
+export function createForest(posts: Post[], options: { signedIn: boolean }): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(FOG_COLOR)
   scene.fog = new THREE.FogExp2(FOG_COLOR, 0.035)
@@ -75,7 +70,7 @@ export function createForest(posts: Post[], options: { canWrite: boolean }): Wor
     interactables.push({ object: painting, label: post.title, action: { kind: 'read', post } })
   })
 
-  if (options.canWrite) {
+  if (options.signedIn) {
     const desk = createDesk('#5a4128')
     desk.position.set(2.2, 0, 4)
     desk.rotation.y = -Math.PI / 2
@@ -87,9 +82,8 @@ export function createForest(posts: Post[], options: { canWrite: boolean }): Wor
     })
   }
 
-  const portal = createPortalSurface('#7fb8ff', 2.4, 3.4)
-  portal.mesh.position.set(0, 1.9, gateZ + 0.75)
-  scene.add(createCastleGate(gateZ), portal.mesh)
+  const gate = createCastleGate(gateZ, options.signedIn)
+  scene.add(gate.castle)
 
   const fireflies = createFireflies(random, gateZ)
   scene.add(fireflies.points)
@@ -100,18 +94,18 @@ export function createForest(posts: Post[], options: { canWrite: boolean }): Wor
     spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, 8), yaw: 0 },
     arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, gateZ + 4), yaw: Math.PI } },
     interactables,
+    door: gate.door,
     portals: [
-      { position: portal.mesh.position.clone().setY(EYE_HEIGHT), radius: 1.3, to: 'castle' },
+      { position: new THREE.Vector3(0, EYE_HEIGHT, gateZ + 0.75), radius: 1.3, to: 'castle' },
     ],
     clamp(position) {
       position.x = THREE.MathUtils.clamp(position.x, -13, 13)
       position.z = THREE.MathUtils.clamp(position.z, gateZ + 1, 10)
     },
     update(_dt, elapsed) {
-      portal.tick(elapsed)
       fireflies.tick(elapsed)
     },
-    dispose: () => disposeScene(scene),
+    dispose: () => disposeObject(scene),
   }
 }
 
@@ -148,7 +142,7 @@ function addTrees(scene: THREE.Scene, random: () => number, gateZ: number) {
   scene.add(trunks, crowns)
 }
 
-function createCastleGate(gateZ: number) {
+function createCastleGate(gateZ: number, open: boolean) {
   const castle = new THREE.Group()
   const stone = new THREE.MeshStandardMaterial({
     color: '#7d7a70',
@@ -166,10 +160,16 @@ function createCastleGate(gateZ: number) {
     castle.add(mesh)
   }
 
-  add(new THREE.Mesh(new THREE.BoxGeometry(12, 7, 1.5), stone), -7.6, 3.5, 0)
-  add(new THREE.Mesh(new THREE.BoxGeometry(12, 7, 1.5), stone), 7.6, 3.5, 0)
-  add(new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.6, 1.5), stone), 0, 5.7, 0)
-  for (const x of [-1.9, 1.9, -13.5, 13.5]) {
+  const wallCenter = DOOR_HALF_WIDTH + 6
+  add(new THREE.Mesh(new THREE.BoxGeometry(12, 7, 1.5), stone), -wallCenter, 3.5, 0)
+  add(new THREE.Mesh(new THREE.BoxGeometry(12, 7, 1.5), stone), wallCenter, 3.5, 0)
+  add(
+    new THREE.Mesh(new THREE.BoxGeometry(DOOR_HALF_WIDTH * 2, 7 - DOOR_HEIGHT, 1.5), stone),
+    0,
+    (7 + DOOR_HEIGHT) / 2,
+    0,
+  )
+  for (const x of [-2.9, 2.9, -13.5, 13.5]) {
     add(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 10, 8), stone), x, 5, 0)
     add(new THREE.Mesh(new THREE.ConeGeometry(1.5, 3, 8), roof), x, 11.5, 0)
   }
@@ -177,15 +177,21 @@ function createCastleGate(gateZ: number) {
   add(new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, 22, 8), stone), 0, 11, -12)
   add(new THREE.Mesh(new THREE.ConeGeometry(3.2, 6, 8), roof), 0, 25, -12)
   for (let x = -13; x <= 13; x += 1.6) {
-    if (Math.abs(x) < 2.5) continue
+    if (Math.abs(x) < 3.5) continue
     add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 1.5), stone), x, 7.4, 0)
   }
 
-  const light = new THREE.PointLight('#7fb8ff', 8, 12)
+  const door = new CastleDoor(open)
+  const hall = new THREE.Mesh(
+    new THREE.PlaneGeometry(DOOR_HALF_WIDTH * 2, DOOR_HEIGHT),
+    new THREE.MeshBasicMaterial({ color: '#ffb070' }),
+  )
+  hall.position.set(0, DOOR_HEIGHT / 2, -1.9)
+  const light = new THREE.PointLight('#ffd9a0', 6, 10)
   light.position.set(0, 2.5, 2)
-  castle.add(light)
+  castle.add(door.group, hall, light)
   castle.position.z = gateZ
-  return castle
+  return { castle, door }
 }
 
 function createFireflies(random: () => number, gateZ: number) {
