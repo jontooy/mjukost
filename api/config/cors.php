@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://privat.bahnhof.se', 'http://localhost:5173'],
+    'allowed_origins' => ['https://privat.bahnhof.se', 'http://privat.bahnhof.se', 'http://localhost:5173'],
 
     'allowed_origins_patterns' => [],
 
