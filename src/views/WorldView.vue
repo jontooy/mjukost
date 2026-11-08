@@ -60,7 +60,7 @@ const locked = ref(false)
 const focusLabel = ref<string | null>(null)
 const hover = ref<Hover | null>(null)
 const reading = ref<{ post: Post; html: string } | null>(null)
-const writing = ref<{ post: Post | null; isPrivate: boolean } | null>(null)
+const writing = ref<{ post: Post | null; isPrivate: boolean; slot: number } | null>(null)
 const preview = ref('')
 const busy = ref(false)
 const readError = ref('')
@@ -227,13 +227,14 @@ async function renderMarkdown(body: string) {
   return DOMPurify.sanitize(marked.parse(resolved, { async: false }) as string)
 }
 
-function startWriting(isPrivate: boolean, post: Post | null) {
+// Writes the post in the given slot: the place of the poster or cell it was started from.
+function startWriting(isPrivate: boolean, slot: number, post: Post | null) {
   reading.value = null
   form.title = post?.title ?? ''
   form.body = post?.body ?? ''
   preview.value = ''
   setStatus('')
-  writing.value = { post, isPrivate }
+  writing.value = { post, isPrivate, slot }
   mode.value = 'write'
   controls.enabled = false
   controls.unlock()
@@ -310,7 +311,7 @@ async function seal() {
     if (active.post) {
       await updatePost(active.post.id, { title, body, is_private: active.post.is_private })
     } else {
-      await createPost({ title, body, is_private: active.isPrivate })
+      await createPost({ title, body, is_private: active.isPrivate, slot: active.slot })
     }
     endWriting()
     await rebuild()
@@ -432,13 +433,13 @@ function closeRead() {
 async function interact() {
   const action = engine.focused?.action
   if (!action || mode.value !== 'walk') return
-  if (action.kind === 'new') return startWriting(action.isPrivate, null)
+  if (action.kind === 'new') return startWriting(action.isPrivate, action.slot, null)
   openRead(action.post, await renderMarkdown(action.post.body))
 }
 
 function editReading() {
   const post = reading.value?.post
-  if (post) startWriting(post.is_private, post)
+  if (post) startWriting(post.is_private, post.slot, post)
 }
 
 async function onDelete(post: Post) {

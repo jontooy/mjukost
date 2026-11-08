@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Post } from '@/types/post'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
-import { PAINTING_HEIGHT, PAINTING_WIDTH, createDesk, createPainting, disposeObject } from '@/world/props'
+import { createBlankPainting, createPainting, disposeObject } from '@/world/props'
 
 const HEIGHT = 4
 const CORRIDOR_HALF_WIDTH = 3
@@ -18,6 +18,7 @@ const CELL_DOOR_HALF = 0.6
 const CELL_DOOR_HEIGHT = 2.4
 const PARTITION_HALF = 0.15
 const STEP = 0.1
+const POSTER_Y = 2.45 // high on the back wall, clear of the skeletons and chains below
 const TELEPORT = 3
 const ROWS_AROUND = 8 // rows kept built on each side of the viewer; the fog hides the rest
 const FOG_FAR = 28
@@ -42,7 +43,6 @@ interface Materials {
   water: THREE.Material
   flame: THREE.Material
   eye: THREE.Material
-  parchment: THREE.Material
 }
 
 interface Row {
@@ -51,13 +51,14 @@ interface Row {
   flames: THREE.Mesh[]
   eyes: THREE.Object3D[]
   torch: THREE.Vector3 | null
-  owned: THREE.Object3D[] // the notes and the desk, which own their materials
+  owned: THREE.Object3D[] // the posters, which own their materials
 }
 
-// Below the throne room: an endless corridor of cells, one for every private note, oldest first.
-// Row by row, the right cell comes before the left. The first empty cell takes the next note.
+// Below the throne room: an endless corridor of cells. Row by row, the right cell holds the
+// lower slot; each private note hangs in the cell of its slot, every other cell has an empty
+// poster to write on.
 export function createDungeon(posts: Post[]): World {
-  const notes = [...posts].sort((a, b) => a.created_at.localeCompare(b.created_at))
+  const notes = new Map(posts.map((post) => [post.slot, post]))
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#030304')
   scene.fog = new THREE.Fog('#030304', 4, FOG_FAR)
@@ -74,7 +75,6 @@ export function createDungeon(posts: Post[]): World {
     water: new THREE.MeshStandardMaterial({ color: '#0b0d0f', metalness: 0.9, roughness: 0.12 }),
     flame: new THREE.MeshBasicMaterial({ color: '#ff8a3c' }),
     eye: new THREE.MeshBasicMaterial({ color: '#ff2a1a', fog: false }),
-    parchment: new THREE.MeshStandardMaterial({ color: '#d9cfb4', emissive: '#3a3020', roughness: 1 }),
   }
   const add = (mesh: THREE.Object3D, x: number, y: number, z: number) => {
     mesh.position.set(x, y, z)
@@ -228,7 +228,7 @@ export function createDungeon(posts: Post[]): World {
 }
 
 // One row: a cell on each side, with bars toward the corridor. Static parts are merged per material.
-function buildRow(index: number, notes: Post[], m: Materials): Row {
+function buildRow(index: number, notes: Map<number, Post>, m: Materials): Row {
   const row: Row = { group: new THREE.Group(), interactables: [], flames: [], eyes: [], torch: null, owned: [] }
   const cells: THREE.Group[] = []
   const start = CELLS_START - index * CELL_LENGTH
@@ -255,7 +255,6 @@ function buildRow(index: number, notes: Post[], m: Materials): Row {
     put(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, CELL_LENGTH), m.iron), side * CORRIDOR_HALF_WIDTH, CELL_DOOR_HEIGHT, -CELL_LENGTH / 2)
     const railToDoor = -(CELL_DOOR_Z + CELL_DOOR_HALF)
     put(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, railToDoor), m.iron), side * CORRIDOR_HALF_WIDTH, 0.3, -railToDoor / 2)
-    put(createCellDoor(m.iron, side), side * CORRIDOR_HALF_WIDTH, 0, CELL_DOOR_Z + CELL_DOOR_HALF)
 
     // The cell's back wall faces the corridor; a cell's contents are laid out facing +z, then turned.
     const cell = new THREE.Group()
@@ -263,30 +262,21 @@ function buildRow(index: number, notes: Post[], m: Materials): Row {
     cell.rotation.y = -side * (Math.PI / 2)
     row.group.add(cell)
     cells.push(cell)
+    // Every cell has a poster on its back wall, above the grim things on its floor: the note of
+    // its slot, or an empty one to write the note of this cell on.
     const slot = index * 2 + (side === 1 ? 0 : 1)
-    const note = notes[slot]
-    if (note) {
-      const painting = createPainting(note, '#5a4630')
-      painting.position.set(0, 2, 0.05)
-      cell.add(painting)
-      row.owned.push(painting)
-      row.interactables.push({ object: painting, label: note.title, action: { kind: 'read', post: note } })
-    } else if (slot === notes.length) {
-      const blank = createBlankNote(m)
-      blank.position.set(0, 2, 0.05)
-      cell.add(blank)
-      // The next note is written at a desk in the corridor, before its empty cell.
-      const desk = createDesk('#3a2a1c')
-      desk.position.set(side * (CORRIDOR_HALF_WIDTH - 0.7), 0, -CELL_LENGTH / 2)
-      desk.rotation.y = -side * (Math.PI / 2)
-      row.group.add(desk)
-      row.owned.push(desk)
-      row.interactables.push({ object: desk, label: 'Write a note here', action: { kind: 'new', isPrivate: true } })
-    } else {
-      const decor = DECOR[Math.floor(random() * DECOR.length)]!
-      const eyes = furnishCell(cell, decor, m, random)
-      if (eyes) row.eyes.push(eyes)
-    }
+    const note = notes.get(slot)
+    const poster = note ? createPainting(note, '#5a4630') : createBlankPainting('#5a4630')
+    poster.position.set(0, POSTER_Y, 0.05)
+    cell.add(poster)
+    row.owned.push(poster)
+    row.interactables.push(
+      note
+        ? { object: poster, label: note.title, action: { kind: 'read', post: note } }
+        : { object: poster, label: 'Write a note here', action: { kind: 'new', isPrivate: true, slot } },
+    )
+    const eyes = furnishCell(cell, DECOR[Math.floor(random() * DECOR.length)]!, m, random)
+    if (eyes) row.eyes.push(eyes)
     const hook = createChain(m.iron, 8)
     hook.position.set(side === 1 ? -1.2 : 1.2, 3.2, 0.06)
     cell.add(hook)
@@ -344,7 +334,7 @@ function mergeByMaterial(root: THREE.Object3D) {
   })
 }
 
-// Materials are shared by the whole dungeon; only the notes and desks own theirs.
+// Materials are shared by the whole dungeon; only the notes and the empty poster own theirs.
 function disposeRow(row: Row) {
   for (const object of row.owned) disposeObject(object)
   row.group.traverse((node) => {
@@ -365,35 +355,6 @@ function blocked(x: number, z: number) {
   return along > -PARTITION_HALF - BODY || along < -CELL_LENGTH + PARTITION_HALF + BODY
 }
 
-// A small barred gate hung on the door's post, standing open into the cell along its bars.
-function createCellDoor(iron: THREE.Material, side: -1 | 1) {
-  const width = CELL_DOOR_HALF * 2 - 0.05
-  const gate = new THREE.Group()
-  for (const y of [0.15, CELL_DOOR_HEIGHT - 0.15]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, width), iron)
-    rail.position.set(0, y, -width / 2)
-    gate.add(rail)
-  }
-  for (let i = 0; i <= 4; i++) {
-    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, CELL_DOOR_HEIGHT - 0.3, 6), iron)
-    bar.position.set(0, CELL_DOOR_HEIGHT / 2, (-i * width) / 4)
-    gate.add(bar)
-  }
-  // Closed, the gate runs along -z from its hinge; open, it swings past square into the cell.
-  gate.rotation.y = -side * (Math.PI / 2 + 0.25)
-  return gate
-}
-
-// An empty frame with blank parchment, waiting for the next note.
-function createBlankNote(m: Materials) {
-  const group = new THREE.Group()
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(PAINTING_WIDTH + 0.16, PAINTING_HEIGHT + 0.16, 0.08), m.wood)
-  const sheet = new THREE.Mesh(new THREE.PlaneGeometry(PAINTING_WIDTH, PAINTING_HEIGHT), m.parchment)
-  sheet.position.z = 0.045
-  group.add(frame, sheet)
-  return group
-}
-
 // Fills an empty cell; returns the eyes if something is watching from it.
 function furnishCell(cell: THREE.Group, decor: Decor, m: Materials, random: () => number) {
   switch (decor) {
@@ -402,7 +363,7 @@ function furnishCell(cell: THREE.Group, decor: Decor, m: Materials, random: () =
       cell.add(createSkeleton(m, decor === 'shackled'))
       return null
     case 'chains': {
-      for (const x of [-0.5, 0.5]) {
+      for (const x of [-0.95, 0.95]) {
         const chain = createChain(m.iron, 12)
         chain.position.set(x, 2.8, 0.06)
         cell.add(chain)

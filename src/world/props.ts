@@ -21,28 +21,20 @@ export function createPainting(post: Post, frameColor: THREE.ColorRepresentation
   return group
 }
 
-export function createDesk(woodColor: THREE.ColorRepresentation) {
+// An empty poster: a frame with blank, faintly glowing parchment, waiting for the next entry.
+export function createBlankPainting(frameColor: THREE.ColorRepresentation) {
   const group = new THREE.Group()
-  const wood = new THREE.MeshStandardMaterial({ color: woodColor, roughness: 0.8 })
-  const top = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.7), wood)
-  top.position.y = 1
-  top.rotation.x = -0.3
-  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1, 0.12), wood)
-  leg.position.y = 0.5
-  const paper = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.5, 0.65),
-    new THREE.MeshStandardMaterial({ color: '#efe6cf', roughness: 1 }),
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(PAINTING_WIDTH + 0.16, PAINTING_HEIGHT + 0.16, 0.08),
+    new THREE.MeshStandardMaterial({ color: frameColor, roughness: 0.6, metalness: 0.2 }),
   )
-  paper.position.set(0, 1.05, 0)
-  paper.rotation.x = -Math.PI / 2 - 0.3
-  const quill = new THREE.Mesh(
-    new THREE.ConeGeometry(0.03, 0.45, 5),
-    new THREE.MeshStandardMaterial({ color: '#f5f5f0', emissive: '#443322' }),
+  frame.castShadow = true
+  const sheet = new THREE.Mesh(
+    new THREE.PlaneGeometry(PAINTING_WIDTH, PAINTING_HEIGHT),
+    new THREE.MeshStandardMaterial({ color: '#d9cfb4', emissive: '#3a3020', roughness: 1 }),
   )
-  quill.position.set(0.05, 1.04, -0.15)
-  quill.rotation.set(-0.3, 0.3, Math.PI / 2)
-  group.add(top, leg, paper, quill)
-  group.traverse((node) => (node.castShadow = true))
+  sheet.position.z = 0.045
+  group.add(frame, sheet)
   return group
 }
 

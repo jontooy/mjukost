@@ -5,7 +5,7 @@ export function listPosts(options: { isPrivate: boolean }): Promise<Post[]> {
   return api<Post[]>(`/posts?is_private=${options.isPrivate ? 1 : 0}`)
 }
 
-export function createPost(input: PostInput): Promise<Post> {
+export function createPost(input: PostInput & { slot: number }): Promise<Post> {
   return api<Post>('/posts', { method: 'POST', body: JSON.stringify(input) })
 }
 

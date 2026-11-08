@@ -4,11 +4,14 @@ import type { Post } from '@/types/post'
 import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
-import { createDesk, createPainting, disposeObject } from '@/world/props'
+import { createBlankPainting, createPainting, disposeObject } from '@/world/props'
 
 const FOG_COLOR = '#9aa58c'
-const PAINTING_SPACING = 2.4
 const PATH_EDGE = 2.6
+const ROAD_START = 8 // the first row of posters, just past the gate
+const ROW_SPACING = 3
+const ROWS_AROUND = 20 // rows kept built on each side of the viewer; the fog hides the rest
+const ROAD_LENGTH = 400
 const WORLD_SEED = 7
 
 const CHUNK_SIZE = 24
@@ -75,47 +78,72 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
   })
   scene.add(sun, sun.target)
 
-  const pathStart = Math.max(20, posts.length * PAINTING_SPACING + 10)
-  const pathEnd = pathStart + 10
-
-  const path = new THREE.Mesh(
-    new THREE.PlaneGeometry(3, pathEnd),
+  // The road runs from the castle gate outward forever; its surface follows the viewer.
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(3, ROAD_LENGTH),
     new THREE.MeshStandardMaterial({ color: '#6e5a40', roughness: 1 }),
   )
-  path.rotation.x = -Math.PI / 2
-  path.position.set(0, 0.01, pathEnd / 2)
-  path.receiveShadow = true
-  scene.add(path)
+  road.rotation.x = -Math.PI / 2
+  road.position.y = 0.01
+  road.receiveShadow = true
+  scene.add(road)
 
-  const woods = createWoods(scene, sun, pathEnd)
+  const woods = createWoods(scene, sun)
 
+  // A poster stands at every place along the road, two to a row, from the gate outward without
+  // end: in each row the right one, as seen walking away from the castle, is the lower slot. A
+  // post hangs on the poster of its slot; the rest are empty, and a signed-in visitor can write
+  // on any of them. Only rows near the viewer exist.
+  const bySlot = new Map(posts.map((post) => [post.slot, post]))
+  const rows = new Map<number, { group: THREE.Group; interactables: Interactable[] }>()
   const interactables: Interactable[] = []
-  const standMaterial = new THREE.MeshStandardMaterial({ color: '#4a3a28', roughness: 0.9 })
-  posts.forEach((post, index) => {
-    const side = index % 2 === 0 ? -1 : 1
-    const stand = new THREE.Group()
-    const painting = createPainting(post, '#8a6a3a')
-    painting.position.y = 1.6
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.2, 6), standMaterial)
-    pole.position.y = 0.6
-    pole.castShadow = true
-    stand.add(painting, pole)
-    stand.position.set(side * PATH_EDGE, 0, pathStart - index * PAINTING_SPACING)
-    stand.rotation.y = (-side * Math.PI) / 2
-    scene.add(stand)
-    interactables.push({ object: painting, label: post.title, action: { kind: 'read', post } })
-  })
 
-  if (options.signedIn) {
-    const desk = createDesk('#5a4128')
-    desk.position.set(2.2, 0, pathStart + 4)
-    desk.rotation.y = -Math.PI / 2
-    scene.add(desk)
-    interactables.push({
-      object: desk,
-      label: 'Write a public post',
-      action: { kind: 'new', isPrivate: false },
-    })
+  function buildRow(row: number) {
+    const group = new THREE.Group()
+    const found: Interactable[] = []
+    for (const side of [-1, 1] as const) {
+      const slot = row * 2 + (side === -1 ? 0 : 1)
+      const post = bySlot.get(slot)
+      const poster = post ? createPainting(post, '#8a6a3a') : createBlankPainting('#8a6a3a')
+      poster.position.y = 1.6
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.06, 1.2, 6),
+        new THREE.MeshStandardMaterial({ color: '#4a3a28', roughness: 0.9 }),
+      )
+      pole.position.y = 0.6
+      pole.castShadow = true
+      const stand = new THREE.Group()
+      stand.add(poster, pole)
+      stand.position.set(side * PATH_EDGE, 0, ROAD_START + row * ROW_SPACING)
+      stand.rotation.y = (-side * Math.PI) / 2
+      group.add(stand)
+      if (post) found.push({ object: poster, label: post.title, action: { kind: 'read', post } })
+      else if (options.signedIn) {
+        found.push({ object: poster, label: 'Write a post here', action: { kind: 'new', isPrivate: false, slot } })
+      }
+    }
+    return { group, interactables: found }
+  }
+
+  function sync(viewerZ: number) {
+    const current = Math.floor((viewerZ - ROAD_START) / ROW_SPACING)
+    const first = Math.max(0, current - ROWS_AROUND)
+    const last = current + ROWS_AROUND
+    for (const [index, row] of rows) {
+      if (index >= first && index <= last) continue
+      scene.remove(row.group)
+      disposeObject(row.group)
+      rows.delete(index)
+    }
+    for (let index = first; index <= last; index++) {
+      if (rows.has(index)) continue
+      const row = buildRow(index)
+      scene.add(row.group)
+      rows.set(index, row)
+    }
+    interactables.length = 0
+    for (const row of rows.values()) interactables.push(...row.interactables)
+    road.position.z = Math.max(ROAD_LENGTH / 2, viewerZ)
   }
 
   scene.add(createCastleGate())
@@ -123,10 +151,13 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
   const fireflies = createFireflies(seededRandom(WORLD_SEED))
   scene.add(fireflies.points)
 
+  const spawn = { position: new THREE.Vector3(0, EYE_HEIGHT, 5), yaw: Math.PI }
+  sync(spawn.position.z)
+  let syncedRow = NaN
   return {
     name: 'forest',
     scene,
-    spawn: { position: new THREE.Vector3(0, EYE_HEIGHT, pathStart + 8), yaw: 0 },
+    spawn,
     arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI } },
     interactables,
     portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0.75), radius: 1.3, to: 'castle' }],
@@ -137,6 +168,11 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
     update(_dt, elapsed, viewer) {
       woods.refresh(viewer)
       fireflies.tick(elapsed, viewer)
+      const row = Math.floor((viewer.z - ROAD_START) / ROW_SPACING)
+      if (row !== syncedRow) {
+        syncedRow = row
+        sync(viewer.z)
+      }
     },
     dispose: () => disposeObject(scene),
   }
@@ -144,7 +180,7 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
 
 // Trees and ground are generated per chunk from a hash of the chunk coordinates, so any
 // place in the forest looks the same every visit. Only chunks around the viewer exist.
-function createWoods(scene: THREE.Scene, sun: THREE.DirectionalLight, pathEnd: number) {
+function createWoods(scene: THREE.Scene, sun: THREE.DirectionalLight) {
   const trunks = new THREE.InstancedMesh(
     new THREE.CylinderGeometry(0.55, 1, 1, 8).translate(0, 0.5, 0),
     new THREE.MeshStandardMaterial({ color: '#3d2e1e', roughness: 1 }),
@@ -220,7 +256,7 @@ function createWoods(scene: THREE.Scene, sun: THREE.DirectionalLight, pathEnd: n
       for (let x = cx - VIEW_CHUNKS; x <= cx + VIEW_CHUNKS; x++) {
         for (let z = cz - VIEW_CHUNKS; z <= cz + VIEW_CHUNKS; z++) {
           const key = chunkKey(x, z)
-          const trees = chunks.get(key) ?? chunkTrees(x, z, pathEnd)
+          const trees = chunks.get(key) ?? chunkTrees(x, z)
           next.set(key, trees)
           for (const tree of trees) writeTree(count++, tree)
         }
@@ -258,7 +294,7 @@ function createWoods(scene: THREE.Scene, sun: THREE.DirectionalLight, pathEnd: n
 
 // One jittered giant and maybe one sapling per cell. Every cell consumes the same amount of
 // randomness, so the clearing filter never shifts the rest of the chunk.
-function chunkTrees(cx: number, cz: number, pathEnd: number): Tree[] {
+function chunkTrees(cx: number, cz: number): Tree[] {
   const random = seededRandom(hash(cx, cz))
   const trees: Tree[] = []
   for (let i = 0; i < CELLS_PER_CHUNK; i++) {
@@ -291,19 +327,20 @@ function chunkTrees(cx: number, cz: number, pathEnd: number): Tree[] {
         hue: 0.25 + random() * 0.08,
         lightness: 0.2 + random() * 0.1,
       }
-      if (hasGiant && !inClearing(giant, pathEnd)) trees.push(giant)
+      if (hasGiant && !inClearing(giant)) trees.push(giant)
       const crowded =
         hasGiant && Math.hypot(sapling.x - giant.x, sapling.z - giant.z) < giant.trunkRadius + 1.5
-      if (hasSapling && !crowded && !inClearing(sapling, pathEnd)) trees.push(sapling)
+      if (hasSapling && !crowded && !inClearing(sapling)) trees.push(sapling)
     }
   }
   return trees
 }
 
-function inClearing(tree: Tree, pathEnd: number) {
+// Open ground around the castle, and along the road, which runs from the gate on forever.
+function inClearing(tree: Tree) {
   const nearCastle = Math.abs(tree.x) < 24 && tree.z > -2 * CASTLE_HALF - 10 && tree.z < 6
-  const nearPath = Math.abs(tree.x) < 6 + tree.trunkRadius && tree.z > -2 && tree.z < pathEnd + 6
-  return nearCastle || nearPath
+  const nearRoad = Math.abs(tree.x) < 6 + tree.trunkRadius && tree.z > -2
+  return nearCastle || nearRoad
 }
 
 function crownGeometry() {
