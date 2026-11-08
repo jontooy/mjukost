@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as THREE from 'three'
 import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
@@ -480,7 +481,7 @@ async function interact() {
     return
   }
   const resolved = await resolvePrivateMarkdownUrls(action.post.body)
-  openRead(action.post, marked.parse(resolved, { async: false }) as string)
+  openRead(action.post, DOMPurify.sanitize(marked.parse(resolved, { async: false }) as string))
 }
 
 async function editReading() {
