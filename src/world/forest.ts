@@ -28,8 +28,21 @@ const SHADOW_EXTENT = 56
 const FIREFLY_COUNT = 160
 const FIREFLY_RANGE = 40
 
-// The player stays outside this box around the castle at the origin; the gate faces +z.
-const CASTLE_BOUNDS = { minX: -15, maxX: 15, minZ: -16, maxZ: 1 }
+// The castle is a square curtain wall with its gate at the origin, facing +z.
+const CASTLE_HALF = DOOR_HALF_WIDTH + 12
+const CASTLE_CENTER_Z = -CASTLE_HALF
+const CORNER_TOWER_RADIUS = 1.9
+const CORNER_TOWERS = [-1, 1].flatMap((side) => [
+  { x: side * CASTLE_HALF, z: 0 },
+  { x: side * CASTLE_HALF, z: -2 * CASTLE_HALF },
+])
+// The player stays outside this box and the corner towers that stick out of it.
+const CASTLE_BOUNDS = {
+  minX: -CASTLE_HALF - CORNER_TOWER_RADIUS - 0.5,
+  maxX: CASTLE_HALF + CORNER_TOWER_RADIUS + 0.5,
+  minZ: -2 * CASTLE_HALF - CORNER_TOWER_RADIUS - 0.5,
+  maxZ: 1,
+}
 
 interface Tree {
   x: number
@@ -289,7 +302,7 @@ function chunkTrees(cx: number, cz: number, pathEnd: number): Tree[] {
 }
 
 function inClearing(tree: Tree, pathEnd: number) {
-  const nearCastle = Math.abs(tree.x) < 24 && tree.z > -30 && tree.z < 6
+  const nearCastle = Math.abs(tree.x) < 24 && tree.z > -2 * CASTLE_HALF - 10 && tree.z < 6
   const nearPath = Math.abs(tree.x) < 6 + tree.trunkRadius && tree.z > -2 && tree.z < pathEnd + 6
   return nearCastle || nearPath
 }
@@ -324,16 +337,27 @@ function hash(x: number, z: number) {
 
 function pushOutOfCastle(position: THREE.Vector3) {
   const { minX, maxX, minZ, maxZ } = CASTLE_BOUNDS
-  if (position.x <= minX || position.x >= maxX || position.z <= minZ || position.z >= maxZ) return
-  const front = maxZ - position.z
-  const back = position.z - minZ
-  const left = position.x - minX
-  const right = maxX - position.x
-  const nearest = Math.min(front, back, left, right)
-  if (nearest === front) position.z = maxZ
-  else if (nearest === back) position.z = minZ
-  else if (nearest === left) position.x = minX
-  else position.x = maxX
+  const inside = position.x > minX && position.x < maxX && position.z > minZ && position.z < maxZ
+  if (inside) {
+    const front = maxZ - position.z
+    const back = position.z - minZ
+    const left = position.x - minX
+    const right = maxX - position.x
+    const nearest = Math.min(front, back, left, right)
+    if (nearest === front) position.z = maxZ
+    else if (nearest === back) position.z = minZ
+    else if (nearest === left) position.x = minX
+    else position.x = maxX
+  }
+  for (const tower of CORNER_TOWERS) {
+    const dx = position.x - tower.x
+    const dz = position.z - tower.z
+    const reach = CORNER_TOWER_RADIUS + 0.5
+    const distance = Math.hypot(dx, dz)
+    if (distance >= reach || distance === 0) continue
+    position.x = tower.x + (dx / distance) * reach
+    position.z = tower.z + (dz / distance) * reach
+  }
 }
 
 function createCastleGate(open: boolean) {
@@ -354,33 +378,132 @@ function createCastleGate(open: boolean) {
     castle.add(mesh)
   }
 
-  const wallCenter = DOOR_HALF_WIDTH + 6
-  add(new THREE.Mesh(new THREE.BoxGeometry(12, 7, 1.5), stone), -wallCenter, 3.5, 0)
-  add(new THREE.Mesh(new THREE.BoxGeometry(12, 7, 1.5), stone), wallCenter, 3.5, 0)
+  const wallHeight = 7
+  const span = CASTLE_HALF * 2
+  const wallSegment = CASTLE_HALF - DOOR_HALF_WIDTH
+  for (const side of [-1, 1]) {
+    add(
+      new THREE.Mesh(new THREE.BoxGeometry(wallSegment, wallHeight, 1.5), stone),
+      side * (DOOR_HALF_WIDTH + wallSegment / 2),
+      wallHeight / 2,
+      0,
+    )
+    add(
+      new THREE.Mesh(new THREE.BoxGeometry(1.5, wallHeight, span), stone),
+      side * CASTLE_HALF,
+      wallHeight / 2,
+      CASTLE_CENTER_Z,
+    )
+  }
+  add(new THREE.Mesh(new THREE.BoxGeometry(span, wallHeight, 1.5), stone), 0, wallHeight / 2, -span)
   add(
-    new THREE.Mesh(new THREE.BoxGeometry(DOOR_HALF_WIDTH * 2, 7 - DOOR_HEIGHT, 1.5), stone),
+    new THREE.Mesh(
+      new THREE.BoxGeometry(DOOR_HALF_WIDTH * 2, wallHeight - DOOR_HEIGHT, 1.5),
+      stone,
+    ),
     0,
-    (7 + DOOR_HEIGHT) / 2,
+    (wallHeight + DOOR_HEIGHT) / 2,
     0,
   )
-  for (const x of [-2.9, 2.9, -13.5, 13.5]) {
-    add(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 10, 8), stone), x, 5, 0)
-    add(new THREE.Mesh(new THREE.ConeGeometry(1.5, 3, 8), roof), x, 11.5, 0)
-  }
-  add(new THREE.Mesh(new THREE.BoxGeometry(18, 14, 14), stone), 0, 7, -9)
-  add(new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, 22, 8), stone), 0, 11, -12)
-  add(new THREE.Mesh(new THREE.ConeGeometry(3.2, 6, 8), roof), 0, 25, -12)
-  for (let x = -13; x <= 13; x += 1.6) {
-    if (Math.abs(x) < 3.5) continue
-    add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 1.5), stone), x, 7.4, 0)
+
+  const courtyard = new THREE.Mesh(
+    new THREE.PlaneGeometry(span, span),
+    new THREE.MeshStandardMaterial({ color: '#6f6a5e', roughness: 1 }),
+  )
+  courtyard.rotation.x = -Math.PI / 2
+  courtyard.position.set(0, 0.02, CASTLE_CENTER_Z)
+  courtyard.receiveShadow = true
+  castle.add(courtyard)
+
+  for (const { x, z } of CORNER_TOWERS) {
+    add(
+      new THREE.Mesh(new THREE.CylinderGeometry(1.6, CORNER_TOWER_RADIUS, 11, 8), stone),
+      x,
+      5.5,
+      z,
+    )
+    add(new THREE.Mesh(new THREE.ConeGeometry(2.1, 3.5, 8), roof), x, 12.75, z)
   }
 
+  // A pair of towers in the middle of every wall; the front pair flanks the gate.
+  const pairOffset = DOOR_HALF_WIDTH + 1.5
+  for (const side of [-1, 1]) {
+    for (const [x, z] of [
+      [side * pairOffset, 0],
+      [side * pairOffset, -span],
+      [-CASTLE_HALF, CASTLE_CENTER_Z + side * pairOffset],
+      [CASTLE_HALF, CASTLE_CENTER_Z + side * pairOffset],
+    ] as const) {
+      add(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 10, 8), stone), x, 5, z)
+      add(new THREE.Mesh(new THREE.ConeGeometry(1.5, 3, 8), roof), x, 11.5, z)
+    }
+  }
+
+  // Battlements along all four walls, clear of the towers.
+  for (let i = -7; i <= 7; i++) {
+    if (Math.abs(i) <= 2) continue
+    const t = i * 1.6
+    const y = wallHeight + 0.4
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 1.5), stone), t, y, 0)
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 1.5), stone), t, y, -span)
+    add(
+      new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.8, 0.8), stone),
+      -CASTLE_HALF,
+      y,
+      CASTLE_CENTER_Z + t,
+    )
+    add(
+      new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.8, 0.8), stone),
+      CASTLE_HALF,
+      y,
+      CASTLE_CENTER_Z + t,
+    )
+  }
+
+  const keepHalf = 6
+  add(
+    new THREE.Mesh(new THREE.BoxGeometry(keepHalf * 2, 12, keepHalf * 2), stone),
+    0,
+    6,
+    CASTLE_CENTER_Z,
+  )
+  for (const x of [-keepHalf, keepHalf]) {
+    for (const z of [CASTLE_CENTER_Z - keepHalf, CASTLE_CENTER_Z + keepHalf]) {
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1, 14, 8), stone), x, 7, z)
+      add(new THREE.Mesh(new THREE.ConeGeometry(1.3, 2.5, 8), roof), x, 15.25, z)
+    }
+  }
+  add(new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, 22, 8), stone), 0, 11, CASTLE_CENTER_Z)
+  add(new THREE.Mesh(new THREE.ConeGeometry(3.2, 6, 8), roof), 0, 25, CASTLE_CENTER_Z)
+
   const door = new CastleDoor(open)
+  // A short roofed passage behind the gate hides the glowing hall from the courtyard.
+  // It is wider than the doorway so the open leaves do not clip into its walls.
+  const passageHalf = DOOR_HALF_WIDTH + 0.3
+  const passageDepth = 1.6
+  const passageZ = -0.75 - passageDepth / 2
   const hall = new THREE.Mesh(
-    new THREE.PlaneGeometry(DOOR_HALF_WIDTH * 2, DOOR_HEIGHT),
+    new THREE.PlaneGeometry(passageHalf * 2, DOOR_HEIGHT),
     new THREE.MeshBasicMaterial({ color: '#ffb070' }),
   )
   hall.position.set(0, DOOR_HEIGHT / 2, -1.9)
+  for (const side of [-1, 1]) {
+    add(
+      new THREE.Mesh(new THREE.BoxGeometry(0.8, wallHeight, passageDepth), stone),
+      side * (passageHalf + 0.4),
+      wallHeight / 2,
+      passageZ,
+    )
+  }
+  add(
+    new THREE.Mesh(
+      new THREE.BoxGeometry(passageHalf * 2 + 1.6, wallHeight - DOOR_HEIGHT, passageDepth),
+      stone,
+    ),
+    0,
+    (wallHeight + DOOR_HEIGHT) / 2,
+    passageZ,
+  )
   const light = new THREE.PointLight('#ffd9a0', 6, 10)
   light.position.set(0, 2.5, 2)
   castle.add(door.group, hall, light)
