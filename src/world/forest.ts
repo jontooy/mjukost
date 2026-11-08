@@ -3,7 +3,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Post } from '@/types/post'
 import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
-import { createDesk, createPainting, disposeObject, seededRandom } from '@/world/props'
+import { seededRandom } from '@/lib/random'
+import { createDesk, createPainting, disposeObject } from '@/world/props'
 
 const FOG_COLOR = '#9aa58c'
 const PAINTING_SPACING = 2.4

@@ -5,14 +5,6 @@ import { createPostTexture } from '@/world/postTexture'
 export const PAINTING_WIDTH = 1.2
 export const PAINTING_HEIGHT = 1.5
 
-export function seededRandom(seed: number) {
-  let state = seed
-  return () => {
-    state = (state * 1664525 + 1013904223) % 4294967296
-    return state / 4294967296
-  }
-}
-
 export function createPainting(post: Post, frameColor: THREE.ColorRepresentation) {
   const group = new THREE.Group()
   const frame = new THREE.Mesh(

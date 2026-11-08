@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
-import { createDesk, createPainting, disposeObject, seededRandom } from '@/world/props'
+import { seededRandom } from '@/lib/random'
+import { createDesk, createPainting, disposeObject } from '@/world/props'
 
 const HALF_WIDTH = 5
 const HEIGHT = 7
