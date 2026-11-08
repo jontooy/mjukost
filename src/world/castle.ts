@@ -5,104 +5,150 @@ import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/w
 import { seededRandom } from '@/lib/random'
 import { createDesk, createPainting, disposeObject } from '@/world/props'
 
-const HALF_WIDTH = 5
-const HEIGHT = 7
+const HALF_WIDTH = 9
+const HEIGHT = 12
+const NAVE_HALF_WIDTH = 5.5 // the two rows of columns
 const NOTE_SPACING = 2.4
-const TORCH_SPACING = 6
+const BAY = 6 // distance between columns, beams, windows and torches
+const DAIS_HALF_WIDTH = 5
+const DAIS_DEPTH = 6
+const DAIS_STEP = 0.3
+const DAIS_STEPS = 3
 // Same opening and passage depth as the gate seen from the forest.
 const GATE_HALF_WIDTH = DOOR_HALF_WIDTH + 0.3
 const GATE_DEPTH = 1.6
 
+// The throne room: a nave of columns and torches, a red carpet up to the king's throne on a dais.
 export function createCastle(notes: Post[]): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#0d0b10')
-  scene.fog = new THREE.Fog('#0d0b10', 8, 34)
-  scene.add(new THREE.AmbientLight('#6a5a7a', 0.6))
+  scene.fog = new THREE.Fog('#0d0b10', 14, 70)
+  scene.add(new THREE.AmbientLight('#6a5a7a', 1.2))
 
-  const length = Math.max(18, Math.ceil(notes.length / 2) * NOTE_SPACING + 10)
+  const length = Math.max(36, Math.ceil(notes.length / 2) * NOTE_SPACING + 8 + DAIS_DEPTH)
   const centerZ = -length / 2
-  const stone = new THREE.MeshStandardMaterial({
-    color: '#5d5850',
-    roughness: 0.95,
-    flatShading: true,
-  })
+  const daisFront = -length + DAIS_DEPTH
+  const stone = new THREE.MeshStandardMaterial({ color: '#5d5850', roughness: 0.95, flatShading: true })
+  const gold = new THREE.MeshStandardMaterial({ color: '#c9a23f', metalness: 0.8, roughness: 0.35 })
+  const velvet = new THREE.MeshStandardMaterial({ color: '#7a1020', roughness: 1 })
+  const wood = new THREE.MeshStandardMaterial({ color: '#3a2414', roughness: 0.8, flatShading: true })
+  const iron = new THREE.MeshStandardMaterial({ color: '#2b2b2e', metalness: 0.7, roughness: 0.5 })
   const random = seededRandom(11)
+  const add = (mesh: THREE.Object3D, x: number, y: number, z: number) => {
+    mesh.position.set(x, y, z)
+    scene.add(mesh)
+    return mesh
+  }
 
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(HALF_WIDTH * 2, length),
     new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9 }),
   )
   floor.rotation.x = -Math.PI / 2
-  floor.position.z = centerZ
   floor.receiveShadow = true
-
+  add(floor, 0, 0, centerZ)
   const ceiling = floor.clone()
   ceiling.rotation.x = Math.PI / 2
-  ceiling.position.y = HEIGHT
-
-  const carpet = new THREE.Mesh(
-    new THREE.PlaneGeometry(2, length - 2),
-    new THREE.MeshStandardMaterial({ color: '#6b1f24', roughness: 1 }),
-  )
-  carpet.rotation.x = -Math.PI / 2
-  carpet.position.set(0, 0.01, centerZ)
-  carpet.receiveShadow = true
-  scene.add(floor, ceiling, carpet)
+  add(ceiling, 0, HEIGHT, centerZ)
 
   for (const side of [-1, 1]) {
     const wall = new THREE.Mesh(new THREE.BoxGeometry(0.6, HEIGHT, length), stone)
-    wall.position.set(side * (HALF_WIDTH + 0.3), HEIGHT / 2, centerZ)
     wall.receiveShadow = true
-    scene.add(wall)
+    add(wall, side * (HALF_WIDTH + 0.3), HEIGHT / 2, centerZ)
   }
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 2 + 1.2, HEIGHT, 0.6), stone)
-  backWall.position.set(0, HEIGHT / 2, -length - 0.3)
-  scene.add(backWall)
+  add(new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 2 + 1.2, HEIGHT, 0.6), stone), 0, HEIGHT / 2, -length - 0.3)
+  scene.add(createGate(stone))
 
+  // The carpet runs from the gate to the dais, then up the steps to the throne.
+  const carpetLength = -daisFront - 0.5
+  const carpet = new THREE.Mesh(new THREE.PlaneGeometry(2.4, carpetLength), velvet)
+  carpet.rotation.x = -Math.PI / 2
+  carpet.receiveShadow = true
+  add(carpet, 0, 0.01, -0.5 - carpetLength / 2)
+  for (const side of [-1, 1]) {
+    const border = new THREE.Mesh(new THREE.PlaneGeometry(0.12, carpetLength), gold)
+    border.rotation.x = -Math.PI / 2
+    add(border, side * 1.26, 0.012, -0.5 - carpetLength / 2)
+  }
+
+  // Wooden beams across the ceiling, one per bay.
+  for (let z = -BAY / 2; z > -length; z -= BAY) {
+    add(new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 2, 0.6, 0.5), wood), 0, HEIGHT - 0.3, z)
+  }
+
+  // Columns with torches face the nave; tall moonlit windows sit high on the outer walls.
   const torches: THREE.PointLight[] = []
   const flameMaterial = new THREE.MeshBasicMaterial({ color: '#ffb347' })
-  for (let z = -3; z > -length + 1; z -= TORCH_SPACING) {
+  const moonlight = new THREE.MeshBasicMaterial({ color: '#34456b' })
+  for (let z = -4; z > daisFront - 1; z -= BAY) {
     for (const side of [-1, 1]) {
-      const column = new THREE.Mesh(new THREE.BoxGeometry(0.7, HEIGHT, 0.7), stone)
-      column.position.set(side * (HALF_WIDTH - 0.2), HEIGHT / 2, z)
+      const x = side * NAVE_HALF_WIDTH
+      const column = add(new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, HEIGHT, 10), stone), x, HEIGHT / 2, z)
       column.castShadow = true
-      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.3, 6), flameMaterial)
-      flame.position.set(side * (HALF_WIDTH - 0.65), 3, z)
-      const light = new THREE.PointLight('#ff9a3c', 6, 10, 1.6)
-      light.position.copy(flame.position).setX(side * (HALF_WIDTH - 1))
-      torches.push(light)
-      scene.add(column, flame, light)
+      add(new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.4, 1.3), stone), x, 0.2, z)
+      add(new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.4, 1.3), stone), x, HEIGHT - 0.8, z)
+      const flameX = side * (NAVE_HALF_WIDTH - 0.6)
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.4, 0.15), iron), flameX, 2.8, z)
+      add(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 6), flameMaterial), flameX, 3.15, z)
+
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 3.6), moonlight)
+      pane.rotation.y = (-side * Math.PI) / 2
+      add(pane, side * (HALF_WIDTH - 0.01), 8.3, z - BAY / 2)
     }
+    // One light per pair of torches keeps the hall fast to render.
+    torches.push(add(new THREE.PointLight('#ff9a3c', 6, 16, 1.4), 0, 3.4, z) as THREE.PointLight)
   }
+
+  // Chandeliers hang over the carpet.
+  for (let z = -8; z > daisFront + 2; z -= BAY * 2) {
+    scene.add(createChandelier(iron, flameMaterial, z))
+  }
+
+  // The dais rises in three steps against the back wall.
+  for (let step = 0; step < DAIS_STEPS; step++) {
+    const halfWidth = DAIS_HALF_WIDTH - step * 0.6
+    const depth = DAIS_DEPTH - step * 0.8
+    const height = DAIS_STEP * (step + 1)
+    const block = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2, height, depth), stone)
+    block.receiveShadow = true
+    add(block, 0, height / 2, -length + depth / 2)
+  }
+  const daisTop = DAIS_STEP * DAIS_STEPS
+  const runner = new THREE.Mesh(new THREE.PlaneGeometry(2.4, DAIS_DEPTH - 0.4), velvet)
+  runner.rotation.x = -Math.PI / 2
+  add(runner, 0, daisTop + 0.01, -length + (DAIS_DEPTH - 0.4) / 2)
+
+  add(createThrone(wood, velvet, gold), 0, daisTop, -length + 2.2)
+
+  // Royal banners on the back wall: a great one behind the throne and one to each side.
+  for (const [x, width, height] of [
+    [0, 3.2, 7],
+    [-6.5, 2, 5.5],
+    [6.5, 2, 5.5],
+  ] as const) {
+    const top = HEIGHT - 1
+    add(new THREE.Mesh(new THREE.PlaneGeometry(width + 0.24, height + 0.24), gold), x, top - height / 2, -length + 0.01)
+    add(new THREE.Mesh(new THREE.PlaneGeometry(width, height), velvet), x, top - height / 2, -length + 0.02)
+    add(new THREE.Mesh(new THREE.CircleGeometry(width * 0.28, 24), gold), x, top - height * 0.4, -length + 0.03)
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, width + 0.6, 8), gold), x, top + 0.1, -length + 0.1)
+      .rotation.z = Math.PI / 2
+  }
+  const throneLight = new THREE.PointLight('#ffd27a', 10, 14, 1.4)
+  add(throneLight, 0, 6, -length + 4)
 
   const interactables: Interactable[] = []
   notes.forEach((note, index) => {
     const side = index % 2 === 0 ? -1 : 1
     const painting = createPainting(note, '#b08a3e')
-    painting.position.set(
-      side * (HALF_WIDTH - 0.05),
-      2,
-      -4.2 - Math.floor(index / 2) * NOTE_SPACING,
-    )
     painting.rotation.y = (-side * Math.PI) / 2
-    scene.add(painting)
-    interactables.push({
-      object: painting,
-      label: note.title,
-      action: { kind: 'read', post: note },
-    })
+    add(painting, side * (HALF_WIDTH - 0.05), 2, -4.2 - Math.floor(index / 2) * NOTE_SPACING)
+    interactables.push({ object: painting, label: note.title, action: { kind: 'read', post: note } })
   })
 
+  // The writing desk stands at the foot of the dais, beside the carpet.
   const desk = createDesk('#3a2a1c')
-  desk.position.set(0, 0, -length + 2)
-  scene.add(desk)
-  interactables.push({
-    object: desk,
-    label: 'Write a private note',
-    action: { kind: 'new', isPrivate: true },
-  })
-
-  scene.add(createGate(stone))
+  add(desk, 3, 0, daisFront + 1.5)
+  interactables.push({ object: desk, label: 'Write a private note', action: { kind: 'new', isPrivate: true } })
 
   return {
     name: 'castle',
@@ -113,7 +159,8 @@ export function createCastle(notes: Post[]): World {
     portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0), radius: 1.2, to: 'forest' }],
     clamp(position) {
       position.x = THREE.MathUtils.clamp(position.x, -HALF_WIDTH + 0.8, HALF_WIDTH - 0.8)
-      position.z = THREE.MathUtils.clamp(position.z, -length + 1, -0.3)
+      // The dais is for the king; visitors stop at its foot.
+      position.z = THREE.MathUtils.clamp(position.z, daisFront + 0.6, -0.3)
       position.y = Math.min(position.y, HEIGHT - 0.3)
     },
     update(_dt, elapsed) {
@@ -123,6 +170,61 @@ export function createCastle(notes: Post[]): World {
     },
     dispose: () => disposeObject(scene),
   }
+}
+
+// A high-backed oak throne with a velvet seat and gold finials, facing the gate.
+function createThrone(wood: THREE.Material, velvet: THREE.Material, gold: THREE.Material) {
+  const throne = new THREE.Group()
+  const add = (geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number) => {
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.position.set(x, y, z)
+    mesh.castShadow = true
+    throne.add(mesh)
+    return mesh
+  }
+  add(new THREE.BoxGeometry(2, 0.3, 1.8), gold, 0, 0.15, 0)
+  add(new THREE.BoxGeometry(1.4, 0.7, 1.1), wood, 0, 0.65, 0.05)
+  add(new THREE.BoxGeometry(1.2, 0.16, 0.95), velvet, 0, 1.08, 0.1)
+  add(new THREE.BoxGeometry(1.4, 3, 0.22), wood, 0, 1.8, -0.55)
+  add(new THREE.BoxGeometry(1.05, 1.9, 0.06), velvet, 0, 1.85, -0.42)
+  for (const side of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.2, 0.5, 1.1), wood, side * 0.8, 1.2, 0.05)
+    add(new THREE.SphereGeometry(0.12, 12, 8), gold, side * 0.8, 1.5, 0.55)
+    add(new THREE.SphereGeometry(0.16, 12, 8), gold, side * 0.62, 3.4, -0.55)
+  }
+  // A crown-like crest on top of the back.
+  add(new THREE.CylinderGeometry(0.42, 0.36, 0.3, 12, 1, true), gold, 0, 3.45, -0.55)
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2
+    add(new THREE.ConeGeometry(0.07, 0.25, 6), gold, Math.cos(angle) * 0.38, 3.72, -0.55 + Math.sin(angle) * 0.38)
+  }
+  return throne
+}
+
+// An iron ring of candles on a chain, with one warm light.
+function createChandelier(iron: THREE.Material, flame: THREE.Material, z: number) {
+  const chandelier = new THREE.Group()
+  const y = HEIGHT - 3.5
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.06, 8, 32), iron)
+  ring.rotation.x = Math.PI / 2
+  ring.position.y = y
+  const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 3.5, 6), iron)
+  chain.position.y = y + 1.75
+  chandelier.add(ring, chain)
+  const wax = new THREE.MeshStandardMaterial({ color: '#efe6cf', roughness: 1 })
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2
+    const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8), wax)
+    candle.position.set(Math.cos(angle) * 1.2, y + 0.18, Math.sin(angle) * 1.2)
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 6), flame)
+    tip.position.set(candle.position.x, y + 0.4, candle.position.z)
+    chandelier.add(candle, tip)
+  }
+  const light = new THREE.PointLight('#ffc070', 8, 16, 1.4)
+  light.position.y = y - 0.3
+  chandelier.add(light)
+  chandelier.position.z = z
+  return chandelier
 }
 
 // The way out mirrors the gate seen from the forest: a short passage, the oak leaves swung open
