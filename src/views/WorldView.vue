@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as THREE from 'three'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { playDoorOpening } from '@/audio/doorSound'
 import sadMjukost from '@/assets/sad-mjukost.svg'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 import { useMedievalMusic } from '@/composables/useMedievalMusic'
@@ -405,6 +406,7 @@ async function turnKey() {
     await auth.signIn(form.email.trim(), form.password)
     ;(document.activeElement as HTMLElement | null)?.blur()
     setStatus('')
+    void playDoorOpening()
     await world.door.unlock(engine)
     const doorway = world.portals[0]!.position
     await engine.moveCamera(
