@@ -263,7 +263,7 @@ function splitBody(body: string) {
 
 async function startWriting(isPrivate: boolean, post: Post | null) {
   const world = engine.world
-  const desk = world?.interactables.find((i) => i.action.kind === 'new')?.object
+  const desk = world?.writingDesk?.(post)
   if (!world || !desk) return
   reading.value = null
   const board = new WritingBoard(
