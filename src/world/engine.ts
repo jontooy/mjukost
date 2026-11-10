@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
 import type { CastleDoor } from '@/world/door'
+import { AsciiRenderer } from '@/ascii/renderer'
+import type { Grid } from '@/ascii/grid'
 
 export type WorldAction = { kind: 'read'; post: Post } | { kind: 'new'; isPrivate: boolean; slot: number }
 
@@ -54,12 +56,13 @@ interface Animation {
 export const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
 
 export class Engine {
-  readonly renderer: THREE.WebGLRenderer
+  readonly ascii: AsciiRenderer
   readonly camera = new THREE.PerspectiveCamera(70, 1, 0.1, 400)
   world: World | null = null
   focused: Interactable | null = null
   centerPick = true
   onFrame: ((dt: number) => void) | null = null
+  onOverlay: ((grid: Grid, camera: THREE.PerspectiveCamera, elapsed: number) => void) | null = null
 
   private readonly timer = new THREE.Timer()
   private readonly raycaster = new THREE.Raycaster()
@@ -67,10 +70,8 @@ export class Engine {
   private frame = 0
   private animations: Animation[] = []
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    this.renderer.shadowMap.enabled = true
+  constructor(canvas: HTMLCanvasElement) {
+    this.ascii = new AsciiRenderer(canvas)
     this.camera.rotation.order = 'YXZ'
     this.resize()
     window.addEventListener('resize', this.resize)
@@ -127,25 +128,31 @@ export class Engine {
     window.removeEventListener('resize', this.resize)
     this.world?.dispose()
     this.timer.dispose()
-    this.renderer.dispose()
+    this.ascii.dispose()
   }
 
   private tick() {
-    const world = this.world
-    if (!world) return
     const dt = Math.min(this.timer.getDelta(), 0.1)
-    this.onFrame?.(dt)
-    world.update?.(dt, this.timer.getElapsed(), this.camera.position)
-    this.runAnimations(dt)
-    const pick = this.centerPick
-      ? this.pickAt(
-          this.center,
-          world.interactables.map((i) => i.object),
-          REACH,
-        )
-      : null
-    this.focused = world.interactables.find((i) => i.object === pick?.target) ?? null
-    this.renderer.render(world.scene, this.camera)
+    const elapsed = this.timer.getElapsed()
+    const world = this.world
+    if (world) {
+      this.onFrame?.(dt)
+      world.update?.(dt, elapsed, this.camera.position)
+      this.runAnimations(dt)
+      const pick = this.centerPick
+        ? this.pickAt(
+            this.center,
+            world.interactables.map((i) => i.object),
+            REACH,
+          )
+        : null
+      this.focused = world.interactables.find((i) => i.object === pick?.target) ?? null
+      this.ascii.render(world.scene, this.camera, elapsed)
+    } else {
+      this.ascii.screen.clear()
+    }
+    this.onOverlay?.(this.ascii.screen, this.camera, elapsed)
+    this.ascii.screen.blit()
   }
 
   private runAnimations(dt: number) {
@@ -162,10 +169,8 @@ export class Engine {
   }
 
   private readonly resize = () => {
-    const width = this.canvas.clientWidth || window.innerWidth
-    const height = this.canvas.clientHeight || window.innerHeight
-    this.renderer.setSize(width, height, false)
-    this.camera.aspect = width / height
+    this.ascii.resize()
+    this.camera.aspect = this.ascii.screen.width / this.ascii.screen.height
     this.camera.updateProjectionMatrix()
   }
 }
