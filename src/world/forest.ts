@@ -4,7 +4,7 @@ import type { Post } from '@/types/post'
 import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
-import { createBlankPainting, createPainting, disposeObject } from '@/world/props'
+import { createBlankPainting, createOfflinePainting, createPainting, disposeObject } from '@/world/props'
 
 const FOG_COLOR = '#9aa58c'
 const PATH_EDGE = 2.6
@@ -60,7 +60,8 @@ interface Tree {
   lightness: number
 }
 
-export function createForest(posts: Post[], options: { signedIn: boolean }): World {
+// `posts` is null when they could not be loaded: then every poster is a crossed-out mjukost.
+export function createForest(posts: Post[] | null, options: { signedIn: boolean }): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(FOG_COLOR)
   scene.fog = new THREE.FogExp2(FOG_COLOR, 0.03)
@@ -94,7 +95,7 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
   // end: in each row the right one, as seen walking away from the castle, is the lower slot. A
   // post hangs on the poster of its slot; the rest are empty, and a signed-in visitor can write
   // on any of them. Only rows near the viewer exist.
-  const bySlot = new Map(posts.map((post) => [post.slot, post]))
+  const bySlot = new Map(posts?.map((post) => [post.slot, post]))
   const rows = new Map<number, { group: THREE.Group; interactables: Interactable[] }>()
   const interactables: Interactable[] = []
 
@@ -104,7 +105,11 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
     for (const side of [-1, 1] as const) {
       const slot = row * 2 + (side === -1 ? 0 : 1)
       const post = bySlot.get(slot)
-      const poster = post ? createPainting(post, '#8a6a3a') : createBlankPainting('#8a6a3a')
+      const poster = !posts
+        ? createOfflinePainting('#8a6a3a')
+        : post
+          ? createPainting(post, '#8a6a3a')
+          : createBlankPainting('#8a6a3a')
       poster.position.y = 1.6
       const pole = new THREE.Mesh(
         new THREE.CylinderGeometry(0.05, 0.06, 1.2, 6),
@@ -118,7 +123,7 @@ export function createForest(posts: Post[], options: { signedIn: boolean }): Wor
       stand.rotation.y = (-side * Math.PI) / 2
       group.add(stand)
       if (post) found.push({ object: poster, label: post.title || 'Untitled', action: { kind: 'read', post } })
-      else if (options.signedIn) {
+      else if (posts && options.signedIn) {
         found.push({ object: poster, label: 'Write a post here', action: { kind: 'new', isPrivate: false, slot } })
       }
     }

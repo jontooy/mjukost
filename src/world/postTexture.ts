@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { resolvePrivateMarkdownUrls } from '@/lib/storage'
 import type { Post } from '@/types/post'
+import { MJUKOST_PROFILE } from '@/world/mjukost'
 
 const WIDTH = 512
 const HEIGHT = 640
@@ -28,6 +29,7 @@ const BODY_LINE_HEIGHT = 32
 const IMAGE_HEIGHT = 220
 const IMAGE_GAP = 14
 const COLOR_IMAGE_PLACEHOLDER = '#d6c8a8'
+const COLOR_CROSS = '#e0301e'
 
 // Each line break in the text starts a new line; an empty line stays empty.
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
@@ -71,7 +73,7 @@ function stripMarkdown(text: string): string {
     .trim()
 }
 
-export function createPostTexture(post: Post): THREE.CanvasTexture {
+function createCanvasTexture() {
   const canvas = document.createElement('canvas')
   canvas.width = WIDTH
   canvas.height = HEIGHT
@@ -79,6 +81,11 @@ export function createPostTexture(post: Post): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.anisotropy = 4
+  return { ctx, texture }
+}
+
+export function createPostTexture(post: Post): THREE.CanvasTexture {
+  const { ctx, texture } = createCanvasTexture()
 
   const imageUrl = post.body.match(/!\[[^\]]*\]\(([^)\s]+)/)?.[1]
   drawPost(ctx, post, imageUrl ? 'loading' : null)
@@ -88,6 +95,18 @@ export function createPostTexture(post: Post): THREE.CanvasTexture {
       texture.needsUpdate = true
     })
   }
+  return texture
+}
+
+// What every poster shows when the posts could not be loaded: a mjukost tube, crossed out.
+// Drawn once and shared by all such posters.
+let offlineTexture: THREE.CanvasTexture | null = null
+export function getOfflineTexture(): THREE.CanvasTexture {
+  if (offlineTexture) return offlineTexture
+  const { ctx, texture } = createCanvasTexture()
+  drawSheet(ctx)
+  drawCrossedMjukost(ctx, (HEIGHT - IMAGE_HEIGHT) / 2)
+  offlineTexture = texture
   return texture
 }
 
@@ -105,17 +124,20 @@ export async function loadPostImage(url: string): Promise<HTMLImageElement | nul
   }
 }
 
+function drawSheet(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = COLOR_PARCHMENT
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  ctx.strokeStyle = COLOR_BORDER
+  ctx.lineWidth = 3
+  ctx.strokeRect(12, 12, WIDTH - 24, HEIGHT - 24)
+}
+
 function drawPost(
   ctx: CanvasRenderingContext2D,
   post: Post,
   image: HTMLImageElement | 'loading' | null,
 ) {
-  ctx.fillStyle = COLOR_PARCHMENT
-  ctx.fillRect(0, 0, WIDTH, HEIGHT)
-
-  ctx.strokeStyle = COLOR_BORDER
-  ctx.lineWidth = 3
-  ctx.strokeRect(12, 12, WIDTH - 24, HEIGHT - 24)
+  drawSheet(ctx)
 
   ctx.textBaseline = 'top'
 
@@ -170,4 +192,39 @@ function drawPost(
     ctx.fillText(line, PADDING, y)
     y += BODY_LINE_HEIGHT
   }
+}
+
+// A mjukost tube lying cap left, crossed out in red, in a picture-sized box from `top` down.
+function drawCrossedMjukost(ctx: CanvasRenderingContext2D, top: number) {
+  const length = CONTENT_WIDTH * 0.9
+  const sealX = PADDING + (CONTENT_WIDTH + length) / 2
+  const middle = top + IMAGE_HEIGHT / 2
+  const outline = MJUKOST_PROFILE.map(([down, half]) => [sealX - down * length, half * length] as const)
+
+  ctx.save()
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = COLOR_BORDER
+  ctx.lineWidth = 4
+  ctx.beginPath()
+  for (const [x, half] of outline) ctx.lineTo(x, middle - half)
+  for (const [x, half] of [...outline].reverse()) ctx.lineTo(x, middle + half)
+  ctx.closePath()
+  // Across the tube where the body meets the shoulder, the shoulder the neck, and the neck the cap.
+  for (const [x, half] of [outline[3]!, outline[4]!, outline[6]!]) {
+    ctx.moveTo(x, middle - half)
+    ctx.lineTo(x, middle + half)
+  }
+  ctx.stroke()
+
+  const inset = 24
+  ctx.strokeStyle = COLOR_CROSS
+  ctx.lineWidth = 8
+  ctx.beginPath()
+  ctx.moveTo(PADDING + inset, top + inset)
+  ctx.lineTo(PADDING + CONTENT_WIDTH - inset, top + IMAGE_HEIGHT - inset)
+  ctx.moveTo(PADDING + CONTENT_WIDTH - inset, top + inset)
+  ctx.lineTo(PADDING + inset, top + IMAGE_HEIGHT - inset)
+  ctx.stroke()
+  ctx.restore()
 }

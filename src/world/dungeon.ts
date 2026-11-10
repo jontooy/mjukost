@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Post } from '@/types/post'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
-import { createBlankPainting, createPainting, disposeObject } from '@/world/props'
+import { createBlankPainting, createOfflinePainting, createPainting, disposeObject } from '@/world/props'
 
 const HEIGHT = 4
 const CORRIDOR_HALF_WIDTH = 3
@@ -56,9 +56,10 @@ interface Row {
 
 // Below the throne room: an endless corridor of cells. Row by row, the right cell holds the
 // lower slot; each private note hangs in the cell of its slot, every other cell has an empty
-// poster to write on.
-export function createDungeon(posts: Post[]): World {
-  const notes = new Map(posts.map((post) => [post.slot, post]))
+// poster to write on. `posts` is null when they could not be loaded: then every poster is a
+// crossed-out mjukost.
+export function createDungeon(posts: Post[] | null): World {
+  const notes = posts && new Map(posts.map((post) => [post.slot, post]))
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#030304')
   scene.fog = new THREE.Fog('#030304', 4, FOG_FAR)
@@ -228,7 +229,8 @@ export function createDungeon(posts: Post[]): World {
 }
 
 // One row: a cell on each side, with bars toward the corridor. Static parts are merged per material.
-function buildRow(index: number, notes: Map<number, Post>, m: Materials): Row {
+// `notes` is null when they could not be loaded.
+function buildRow(index: number, notes: Map<number, Post> | null, m: Materials): Row {
   const row: Row = { group: new THREE.Group(), interactables: [], flames: [], eyes: [], torch: null, owned: [] }
   const cells: THREE.Group[] = []
   const start = CELLS_START - index * CELL_LENGTH
@@ -265,16 +267,20 @@ function buildRow(index: number, notes: Map<number, Post>, m: Materials): Row {
     // Every cell has a poster on its back wall, above the grim things on its floor: the note of
     // its slot, or an empty one to write the note of this cell on.
     const slot = index * 2 + (side === 1 ? 0 : 1)
-    const note = notes.get(slot)
-    const poster = note ? createPainting(note, '#5a4630') : createBlankPainting('#5a4630')
+    const note = notes?.get(slot)
+    const poster = !notes
+      ? createOfflinePainting('#5a4630')
+      : note
+        ? createPainting(note, '#5a4630')
+        : createBlankPainting('#5a4630')
     poster.position.set(0, POSTER_Y, 0.05)
     cell.add(poster)
     row.owned.push(poster)
-    row.interactables.push(
-      note
-        ? { object: poster, label: note.title || 'Untitled', action: { kind: 'read', post: note } }
-        : { object: poster, label: 'Write a note here', action: { kind: 'new', isPrivate: true, slot } },
-    )
+    if (note) {
+      row.interactables.push({ object: poster, label: note.title || 'Untitled', action: { kind: 'read', post: note } })
+    } else if (notes) {
+      row.interactables.push({ object: poster, label: 'Write a note here', action: { kind: 'new', isPrivate: true, slot } })
+    }
     const eyes = furnishCell(cell, DECOR[Math.floor(random() * DECOR.length)]!, m, random)
     if (eyes) row.eyes.push(eyes)
     const hook = createChain(m.iron, 8)

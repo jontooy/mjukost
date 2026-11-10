@@ -2,6 +2,8 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { api, ApiError, getToken, setToken } from '@/lib/api'
 
+const AUTH_TIMEOUT_MS = 5000
+
 export interface AuthUser {
   id: string
   email: string
@@ -17,8 +19,9 @@ export const useAuthStore = defineStore('auth', () => {
     if (ready.value) return
 
     if (getToken()) {
+      // The app mounts only after this, so a backend that accepts but never answers must not hold it.
       try {
-        user.value = await api<AuthUser>('/user')
+        user.value = await api<AuthUser>('/user', { signal: AbortSignal.timeout(AUTH_TIMEOUT_MS) })
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           setToken(null)

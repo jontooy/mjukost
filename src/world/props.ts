@@ -1,21 +1,27 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
-import { createPostTexture } from '@/world/postTexture'
+import { createPostTexture, getOfflineTexture } from '@/world/postTexture'
 
 export const PAINTING_WIDTH = 1.2
 export const PAINTING_HEIGHT = 1.5
 
 export function createPainting(post: Post, frameColor: THREE.ColorRepresentation) {
+  return framed(new THREE.MeshStandardMaterial({ map: createPostTexture(post), roughness: 0.9 }), frameColor)
+}
+
+// A poster shown when the posts could not be loaded: a crossed-out mjukost.
+export function createOfflinePainting(frameColor: THREE.ColorRepresentation) {
+  return framed(new THREE.MeshStandardMaterial({ map: getOfflineTexture(), roughness: 0.9 }), frameColor)
+}
+
+function framed(material: THREE.Material, frameColor: THREE.ColorRepresentation) {
   const group = new THREE.Group()
   const frame = new THREE.Mesh(
     new THREE.BoxGeometry(PAINTING_WIDTH + 0.16, PAINTING_HEIGHT + 0.16, 0.08),
     new THREE.MeshStandardMaterial({ color: frameColor, roughness: 0.6, metalness: 0.2 }),
   )
   frame.castShadow = true
-  const canvas = new THREE.Mesh(
-    new THREE.PlaneGeometry(PAINTING_WIDTH, PAINTING_HEIGHT),
-    new THREE.MeshStandardMaterial({ map: createPostTexture(post), roughness: 0.9 }),
-  )
+  const canvas = new THREE.Mesh(new THREE.PlaneGeometry(PAINTING_WIDTH, PAINTING_HEIGHT), material)
   canvas.position.z = 0.045
   group.add(frame, canvas)
   return group

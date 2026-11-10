@@ -86,12 +86,13 @@ async function enter(name: WorldName, from?: WorldName) {
   loading.value = true
   loadError.value = false
   try {
+    // Posts that cannot be loaded leave the world standing, its posters crossed out.
     const world =
       name === 'dungeon'
-        ? createDungeon(await listPosts({ isPrivate: true }))
+        ? createDungeon(await listPosts({ isPrivate: true }).catch(() => null))
         : name === 'castle'
           ? createCastle({ signedIn: auth.isAuthenticated })
-          : createForest(await listPosts({ isPrivate: false }), { signedIn: auth.isAuthenticated })
+          : createForest(await listPosts({ isPrivate: false }).catch(() => null), { signedIn: auth.isAuthenticated })
     engine.setWorld(world, from)
     controls.syncFromCamera()
     worldName.value = name

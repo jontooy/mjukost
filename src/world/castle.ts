@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { EYE_HEIGHT, type World } from '@/world/engine'
 import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { seededRandom } from '@/lib/random'
+import { MJUKOST_PROFILE } from '@/world/mjukost'
 import { disposeObject } from '@/world/props'
 
 const HALF_WIDTH = 9
@@ -122,17 +123,15 @@ export function createCastle(options: { signedIn: boolean }): World {
   add(createThrone(wood, velvet, gold), 0, daisTop, -LENGTH + 2.2)
 
   // Royal banners on the back wall: a great one behind the throne and one to each side.
+  // Matte, faintly glowing cloth and gilt: polished gold shows black with nothing to reflect.
+  const bannerVelvet = new THREE.MeshStandardMaterial({ color: '#8a1424', emissive: '#2a0508', roughness: 1 })
+  const gilt = new THREE.MeshStandardMaterial({ color: '#d8b04a', emissive: '#4a3408', roughness: 0.6 })
   for (const [x, width, height] of [
     [0, 3.2, 7],
     [-6.5, 2, 5.5],
     [6.5, 2, 5.5],
   ] as const) {
-    const top = HEIGHT - 1
-    add(new THREE.Mesh(new THREE.PlaneGeometry(width + 0.24, height + 0.24), gold), x, top - height / 2, -LENGTH + 0.01)
-    add(new THREE.Mesh(new THREE.PlaneGeometry(width, height), velvet), x, top - height / 2, -LENGTH + 0.02)
-    add(new THREE.Mesh(new THREE.CircleGeometry(width * 0.28, 24), gold), x, top - height * 0.4, -LENGTH + 0.03)
-    add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, width + 0.6, 8), gold), x, top + 0.1, -LENGTH + 0.1)
-      .rotation.z = Math.PI / 2
+    add(createBanner(width, height, bannerVelvet, gilt), x, HEIGHT - 1, -LENGTH)
   }
   const throneLight = new THREE.PointLight('#ffd27a', 10, 14, 1.4)
   add(throneLight, 0, 6, -LENGTH + 4)
@@ -212,6 +211,30 @@ function createThrone(wood: THREE.Material, velvet: THREE.Material, gold: THREE.
     add(new THREE.ConeGeometry(0.07, 0.25, 6), gold, Math.cos(angle) * 0.38, 3.72, -0.55 + Math.sin(angle) * 0.38)
   }
   return throne
+}
+
+// The tube outline with its top centre at the origin.
+function mjukostShape(length: number) {
+  const right = MJUKOST_PROFILE.map(([down, half]) => new THREE.Vector2(half * length, -down * length))
+  const left = right.map((point) => new THREE.Vector2(-point.x, point.y)).reverse()
+  return new THREE.Shape([...right, ...left])
+}
+
+// A velvet banner in a gold border on a gold rod, its emblem a gold mjukost tube with the cap down.
+// Its top centre is the group's origin; it faces +z, a hair off the wall behind it.
+function createBanner(width: number, height: number, velvet: THREE.Material, gold: THREE.Material) {
+  const banner = new THREE.Group()
+  const add = (geometry: THREE.BufferGeometry, material: THREE.Material, y: number, z: number) => {
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.position.set(0, y, z)
+    banner.add(mesh)
+    return mesh
+  }
+  add(new THREE.PlaneGeometry(width + 0.24, height + 0.24), gold, -height / 2, 0.01)
+  add(new THREE.PlaneGeometry(width, height), velvet, -height / 2, 0.02)
+  add(new THREE.CylinderGeometry(0.06, 0.06, width + 0.6, 8), gold, 0.1, 0.1).rotation.z = Math.PI / 2
+  add(new THREE.ShapeGeometry(mjukostShape(height * 0.5)), gold, -height * 0.12, 0.03)
+  return banner
 }
 
 // The sign-in door: the oak double door with its seal, set in a stone frame.
