@@ -688,9 +688,6 @@ onBeforeUnmount(() => {
 
     <div class="absolute top-3 right-3 left-3 flex items-start justify-between gap-3 text-white">
       <div class="flex flex-col gap-1">
-        <p v-if="worldName === 'dungeon'" class="m-0 font-serif text-lg tracking-wide drop-shadow">
-          The dungeon
-        </p>
         <p v-if="consoleOpen" class="m-0 w-fit bg-black/50 px-2 py-0.5 font-mono text-[0.95rem]">
           {{ coordinates }}
         </p>

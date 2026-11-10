@@ -2,7 +2,6 @@ import * as THREE from 'three'
 import { EYE_HEIGHT, type World } from '@/world/engine'
 import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { seededRandom } from '@/lib/random'
-import { MJUKOST_PROFILE } from '@/world/mjukost'
 import { disposeObject } from '@/world/props'
 
 const HALF_WIDTH = 9
@@ -11,6 +10,7 @@ const NAVE_HALF_WIDTH = 5.5 // the two rows of columns
 const BAY = 6 // distance between columns, beams, windows and torches
 const DAIS_HALF_WIDTH = 5
 const DAIS_DEPTH = 6
+const DAIS_STEP_DEPTH = 0.8 // how far each step sets back from the one below
 const DAIS_STEP = 0.3
 const DAIS_STEPS = 3
 // Same opening and passage depth as the gate seen from the forest.
@@ -106,19 +106,31 @@ export function createCastle(options: { signedIn: boolean }): World {
     scene.add(createChandelier(iron, flameMaterial, z))
   }
 
-  // The dais rises in three steps against the back wall.
+  // The dais rises in three steps against the back wall. The carpet climbs it, up each riser and
+  // along each tread, with its gold borders, to the back wall.
   for (let step = 0; step < DAIS_STEPS; step++) {
     const halfWidth = DAIS_HALF_WIDTH - step * 0.6
-    const depth = DAIS_DEPTH - step * 0.8
+    const depth = DAIS_DEPTH - step * DAIS_STEP_DEPTH
     const height = DAIS_STEP * (step + 1)
     const block = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2, height, depth), stone)
     block.receiveShadow = true
     add(block, 0, height / 2, -LENGTH + depth / 2)
+
+    const front = -LENGTH + depth
+    const tread = step === DAIS_STEPS - 1 ? depth : DAIS_STEP_DEPTH
+    for (const [width, x, material, lift] of [
+      [2.4, 0, velvet, 0.01],
+      [0.12, -1.26, gold, 0.012],
+      [0.12, 1.26, gold, 0.012],
+    ] as const) {
+      add(new THREE.Mesh(new THREE.PlaneGeometry(width, DAIS_STEP), material), x, height - DAIS_STEP / 2, front + lift)
+      const top = new THREE.Mesh(new THREE.PlaneGeometry(width, tread), material)
+      top.rotation.x = -Math.PI / 2
+      top.receiveShadow = true
+      add(top, x, height + lift, front - tread / 2)
+    }
   }
   const daisTop = DAIS_STEP * DAIS_STEPS
-  const runner = new THREE.Mesh(new THREE.PlaneGeometry(2.4, DAIS_DEPTH - 0.4), velvet)
-  runner.rotation.x = -Math.PI / 2
-  add(runner, 0, daisTop + 0.01, -LENGTH + (DAIS_DEPTH - 0.4) / 2)
 
   add(createThrone(wood, velvet, gold), 0, daisTop, -LENGTH + 2.2)
 
@@ -212,6 +224,19 @@ function createThrone(wood: THREE.Material, velvet: THREE.Material, gold: THREE.
   }
   return throne
 }
+
+// Half-widths down the outline of a mjukost tube, from the crimped seal (0) to the end of the cap (1),
+// as fractions of the tube's length.
+const MJUKOST_PROFILE = [
+  [0, 0.175], // crimped seal
+  [0.026, 0.175],
+  [0.044, 0.159], // seal flares into the body
+  [0.882, 0.1], // body tapers to the shoulder
+  [0.918, 0.039], // shoulder narrows to the neck
+  [0.953, 0.039],
+  [0.953, 0.056], // cap
+  [1, 0.056],
+] as const
 
 // The tube outline with its top centre at the origin.
 function mjukostShape(length: number) {

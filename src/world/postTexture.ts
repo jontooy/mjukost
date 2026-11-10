@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 import { resolvePrivateMarkdownUrls } from '@/lib/storage'
 import type { Post } from '@/types/post'
-import { MJUKOST_PROFILE } from '@/world/mjukost'
 
 const WIDTH = 512
 const HEIGHT = 640
@@ -98,14 +97,14 @@ export function createPostTexture(post: Post): THREE.CanvasTexture {
   return texture
 }
 
-// What every poster shows when the posts could not be loaded: a mjukost tube, crossed out.
+// What every poster shows when the posts could not be loaded: the crossed-out mjukost icon.
 // Drawn once and shared by all such posters.
 let offlineTexture: THREE.CanvasTexture | null = null
 export function getOfflineTexture(): THREE.CanvasTexture {
   if (offlineTexture) return offlineTexture
   const { ctx, texture } = createCanvasTexture()
   drawSheet(ctx)
-  drawCrossedMjukost(ctx, (HEIGHT - IMAGE_HEIGHT) / 2)
+  drawOfflineIcon(ctx)
   offlineTexture = texture
   return texture
 }
@@ -194,37 +193,26 @@ function drawPost(
   }
 }
 
-// A mjukost tube lying cap left, crossed out in red, in a picture-sized box from `top` down.
-function drawCrossedMjukost(ctx: CanvasRenderingContext2D, top: number) {
-  const length = CONTENT_WIDTH * 0.9
-  const sealX = PADDING + (CONTENT_WIDTH + length) / 2
-  const middle = top + IMAGE_HEIGHT / 2
-  const outline = MJUKOST_PROFILE.map(([down, half]) => [sealX - down * length, half * length] as const)
+// The crossed-out mjukost icon, drawn on a 24-unit grid in the style of Lucide icons.
+const OFFLINE_ICON_SIZE = 320
+const OFFLINE_ICON_TUBE = [
+  'M2 9h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z', // cap
+  'M5 11h1.5l2-1.5 12-2 1-1h1v11h-1l-1-1-12-2-2-1.5H5', // neck, shoulder, body and seal
+  'M8.5 9.5v5', // where the shoulder meets the body
+]
+const OFFLINE_ICON_CROSS = 'M8 4l9 16M17 4 8 20'
 
+function drawOfflineIcon(ctx: CanvasRenderingContext2D) {
+  const scale = OFFLINE_ICON_SIZE / 24
   ctx.save()
+  ctx.translate((WIDTH - OFFLINE_ICON_SIZE) / 2, (HEIGHT - OFFLINE_ICON_SIZE) / 2)
+  ctx.scale(scale, scale)
+  ctx.lineWidth = 2
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
   ctx.strokeStyle = COLOR_BORDER
-  ctx.lineWidth = 4
-  ctx.beginPath()
-  for (const [x, half] of outline) ctx.lineTo(x, middle - half)
-  for (const [x, half] of [...outline].reverse()) ctx.lineTo(x, middle + half)
-  ctx.closePath()
-  // Across the tube where the body meets the shoulder, the shoulder the neck, and the neck the cap.
-  for (const [x, half] of [outline[3]!, outline[4]!, outline[6]!]) {
-    ctx.moveTo(x, middle - half)
-    ctx.lineTo(x, middle + half)
-  }
-  ctx.stroke()
-
-  const inset = 24
+  for (const path of OFFLINE_ICON_TUBE) ctx.stroke(new Path2D(path))
   ctx.strokeStyle = COLOR_CROSS
-  ctx.lineWidth = 8
-  ctx.beginPath()
-  ctx.moveTo(PADDING + inset, top + inset)
-  ctx.lineTo(PADDING + CONTENT_WIDTH - inset, top + IMAGE_HEIGHT - inset)
-  ctx.moveTo(PADDING + CONTENT_WIDTH - inset, top + inset)
-  ctx.lineTo(PADDING + inset, top + IMAGE_HEIGHT - inset)
-  ctx.stroke()
+  ctx.stroke(new Path2D(OFFLINE_ICON_CROSS))
   ctx.restore()
 }
