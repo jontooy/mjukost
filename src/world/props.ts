@@ -30,8 +30,8 @@ function posterText(post: Post): WorldText {
   const lines: WorldText = []
   if (post.title) lines.push({ text: post.title, colour: TITLE })
   lines.push({ text: new Date(post.created_at).toLocaleDateString(), colour: DATE })
-  const imageUrl = post.body.match(/!\[[^\]]*\]\(([^)\s]+)/)?.[1]
-  if (imageUrl) lines.push({ text: '[image]', colour: DATE, image: new AsciiImage(imageUrl) })
+  if (post.image_ascii) lines.push({ text: '', colour: DATE, image: new AsciiImage(post.image_ascii) })
+  else if (/!\[[^\]]*\]\(/.test(post.body)) lines.push({ text: '[image]', colour: DATE })
   lines.push({ text: '', colour: BODY })
   for (const line of stripMarkdown(post.body).split('\n')) lines.push({ text: line, colour: BODY })
   return lines

@@ -69,18 +69,27 @@ class PostController extends Controller
     }
 
     /**
-     * The title may be left out; the text may not.
+     * The title may be left out; the text may not. image_ascii is the first image as glyphs:
+     * `levels` holds one digit per cell (an index into the glyph ramp), `colours` six hex digits per cell.
      *
-     * @return array{title: string, body: string, is_private: bool}
+     * @return array{title: string, body: string, is_private: bool, image_ascii: array<string, mixed>|null}
      */
     private function validatedPost(Request $request): array
     {
+        $cells = (int) $request->input('image_ascii.cols') * (int) $request->input('image_ascii.rows');
+        $size = ['required_with:image_ascii', 'integer', 'min:1', 'max:80'];
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:200'],
             'body' => ['required', 'string'],
             'is_private' => ['required', 'boolean'],
+            'image_ascii' => ['nullable', 'array:cols,rows,levels,colours'],
+            'image_ascii.cols' => $size,
+            'image_ascii.rows' => $size,
+            'image_ascii.levels' => ['required_with:image_ascii', 'string', 'size:'.$cells, 'regex:/^[0-9]+$/'],
+            'image_ascii.colours' => ['required_with:image_ascii', 'string', 'size:'.($cells * 6), 'regex:/^[0-9a-f]+$/'],
         ]);
         $data['title'] ??= '';
+        $data['image_ascii'] ??= null;
 
         return $data;
     }

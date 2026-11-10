@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { Grid } from './grid'
 import type { AsciiImage } from './image'
 
-/** One line of a sign. With `image`, the picture is drawn once it has loaded; `text` shows until then. */
+/** One line of a sign. With `image`, the picture is drawn in place of `text`. */
 export interface WorldTextLine { text: string; colour: string; image?: AsciiImage }
 export type WorldText = WorldTextLine[]
 
@@ -83,16 +83,16 @@ export function drawWorldText(grid: Grid, rect: CellRect, lines: WorldText): voi
   let y = top
   for (const line of lines) {
     const image = line.image
-    if (image?.image) {
-      const fullRows = image.rowsFor(width)
+    if (image) {
+      const fullRows = Math.max(1, Math.round((width * image.rows) / image.cols))
       const rows = Math.min(fullRows, bottom - y + 1 - TEXT_ROOM)
       if (rows < 1) continue
       const cols = Math.max(1, Math.round((width * rows) / fullRows))
-      image.sample(cols, rows)
       const x0 = left + Math.floor((width - cols) / 2)
       for (let r = 0; r < rows; r++) {
+        const row = Math.floor((r * image.rows) / rows) * image.cols
         for (let c = 0; c < cols; c++) {
-          const i = r * cols + c
+          const i = row + Math.floor((c * image.cols) / cols)
           grid.textDepth(x0 + c, y + r, image.glyph[i]!, image.colour[i]!, rect.d - 0.02)
         }
       }

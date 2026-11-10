@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 // A post's slot is its place in the world: a poster along the road for public posts, a cell in
 // the dungeon for private ones. Slots are unique among public posts and among private posts.
-#[Fillable(['title', 'body', 'is_private', 'slot'])]
+// image_ascii is the post's first image as glyphs for its poster; see src/ascii/image.ts.
+#[Fillable(['title', 'body', 'is_private', 'slot', 'image_ascii'])]
 class Post extends Model
 {
     public const MAX_SLOT = 10_000_000;
@@ -24,7 +25,7 @@ class Post extends Model
      */
     protected function casts(): array
     {
-        return ['is_private' => 'boolean', 'slot' => 'integer'];
+        return ['is_private' => 'boolean', 'slot' => 'integer', 'image_ascii' => 'array'];
     }
 
     /**
