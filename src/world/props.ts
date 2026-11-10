@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
+import { AsciiImage } from '@/ascii/image'
 import { surface } from '@/ascii/surfaces'
 import type { WorldText } from '@/ascii/worldText'
 
@@ -29,7 +30,8 @@ function posterText(post: Post): WorldText {
   const lines: WorldText = []
   if (post.title) lines.push({ text: post.title, colour: TITLE })
   lines.push({ text: new Date(post.created_at).toLocaleDateString(), colour: DATE })
-  if (/!\[[^\]]*\]\(/.test(post.body)) lines.push({ text: '[image]', colour: DATE })
+  const imageUrl = post.body.match(/!\[[^\]]*\]\(([^)\s]+)/)?.[1]
+  if (imageUrl) lines.push({ text: '[image]', colour: DATE, image: new AsciiImage(imageUrl) })
   lines.push({ text: '', colour: BODY })
   for (const line of stripMarkdown(post.body).split('\n')) lines.push({ text: line, colour: BODY })
   return lines

@@ -1,8 +1,14 @@
 import * as THREE from 'three'
 import type { Grid } from './grid'
+import type { AsciiImage } from './image'
 
-export interface WorldTextLine { text: string; colour: string }
+/** One line of a sign. With `image`, the picture is drawn once it has loaded; `text` shows until then. */
+export interface WorldTextLine { text: string; colour: string; image?: AsciiImage }
 export type WorldText = WorldTextLine[]
+
+/** Rows kept below an image so at least one line of the text after it shows. */
+const TEXT_ROOM = 2
+
 export interface CellRect { x0: number; y0: number; x1: number; y1: number; d: number }
 
 const _w = new THREE.Vector3()
@@ -76,6 +82,23 @@ export function drawWorldText(grid: Grid, rect: CellRect, lines: WorldText): voi
   if (width < 8 || bottom < top) return
   let y = top
   for (const line of lines) {
+    const image = line.image
+    if (image?.image) {
+      const fullRows = image.rowsFor(width)
+      const rows = Math.min(fullRows, bottom - y + 1 - TEXT_ROOM)
+      if (rows < 1) continue
+      const cols = Math.max(1, Math.round((width * rows) / fullRows))
+      image.sample(cols, rows)
+      const x0 = left + Math.floor((width - cols) / 2)
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const i = r * cols + c
+          grid.textDepth(x0 + c, y + r, image.glyph[i]!, image.colour[i]!, rect.d - 0.02)
+        }
+      }
+      y += rows
+      continue
+    }
     for (const row of wrapText(line.text, width)) {
       if (y > bottom) return
       grid.textDepth(left, y, row, line.colour, rect.d - 0.02)
