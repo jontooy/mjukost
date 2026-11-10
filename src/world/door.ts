@@ -1,13 +1,7 @@
 import * as THREE from 'three'
 import { easeInOut, type Engine, type Pick } from '@/world/engine'
-import {
-  SLOT_HEIGHT,
-  SLOT_REGIONS,
-  SLOT_WIDTH,
-  drawSlot,
-  type Rect,
-  type SlotState,
-} from '@/world/paperCanvas'
+import { surface } from '@/ascii/surfaces'
+import { SLOT_HEIGHT, SLOT_REGIONS, SLOT_WIDTH, type Rect } from '@/world/paperCanvas'
 
 export type DoorItem = 'email' | 'password' | 'key'
 
@@ -31,28 +25,19 @@ export class CastleDoor {
   private readonly rightPivot = createDoorLeaf(1)
   private readonly plate: THREE.Mesh
   private readonly keyhole: THREE.Mesh
-  private readonly slotContext: CanvasRenderingContext2D
-  private readonly slotTexture: THREE.CanvasTexture
 
   constructor(open: boolean) {
     this.group.add(this.leftPivot, this.rightPivot)
 
-    const canvas = document.createElement('canvas')
-    canvas.width = SLOT_WIDTH
-    canvas.height = SLOT_HEIGHT
-    this.slotContext = canvas.getContext('2d')!
-    this.slotTexture = new THREE.CanvasTexture(canvas)
-    this.slotTexture.colorSpace = THREE.SRGBColorSpace
-    this.slotTexture.anisotropy = 8
     this.plate = new THREE.Mesh(
       new THREE.PlaneGeometry(PLATE_SIZE.width, PLATE_SIZE.height),
-      new THREE.MeshStandardMaterial({ map: this.slotTexture, metalness: 0.3, roughness: 0.5 }),
+      new THREE.MeshStandardMaterial({ color: '#c79f5e', roughness: 0.9, ...surface('parchment') }),
     )
     this.plate.position.copy(PLATE_CENTER)
 
     this.keyhole = new THREE.Mesh(
       new THREE.CylinderGeometry(0.07, 0.07, 0.02, 24),
-      new THREE.MeshStandardMaterial({ color: '#b08d57', metalness: 0.8, roughness: 0.3 }),
+      new THREE.MeshStandardMaterial({ color: '#b08d57', metalness: 0.8, roughness: 0.3, ...surface('gold') }),
     )
     this.keyhole.rotation.x = Math.PI / 2
     this.keyhole.position.copy(KEYHOLE)
@@ -65,11 +50,6 @@ export class CastleDoor {
 
     this.targets = [this.plate, this.keyhole]
     if (open) this.setAngle(1)
-  }
-
-  render(state: SlotState) {
-    drawSlot(this.slotContext, state)
-    this.slotTexture.needsUpdate = true
   }
 
   itemAt(pick: Pick): { item: DoorItem; label: string } | null {
@@ -126,8 +106,8 @@ export class CastleDoor {
 
 // One oak leaf with iron bands, hung from a pivot at its hinge edge; side -1 is the left leaf.
 export function createDoorLeaf(side: -1 | 1) {
-  const oak = new THREE.MeshStandardMaterial({ color: '#4b3320', roughness: 0.85, flatShading: true })
-  const iron = new THREE.MeshStandardMaterial({ color: '#2b2b2e', metalness: 0.7, roughness: 0.5 })
+  const oak = new THREE.MeshStandardMaterial({ color: '#4b3320', roughness: 0.85, flatShading: true, ...surface('wood') })
+  const iron = new THREE.MeshStandardMaterial({ color: '#2b2b2e', metalness: 0.7, roughness: 0.5, ...surface('iron') })
   const pivot = new THREE.Group()
   pivot.position.x = side * DOOR_HALF_WIDTH
   const leaf = new THREE.Mesh(new THREE.BoxGeometry(DOOR_HALF_WIDTH, DOOR_HEIGHT, LEAF_THICKNESS), oak)
@@ -153,6 +133,7 @@ function createKey() {
     metalness: 0.9,
     roughness: 0.25,
     emissive: '#3a2a08',
+    ...surface('gold'),
   })
   const key = new THREE.Group()
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.2, 10), gold)
