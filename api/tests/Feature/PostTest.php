@@ -43,7 +43,7 @@ class PostTest extends TestCase
         Post::factory()->create();
 
         $this->assertEqualsCanonicalizing(
-            ['id', 'user_id', 'title', 'body', 'is_private', 'slot', 'created_at', 'updated_at'],
+            ['id', 'user_id', 'title', 'body', 'is_private', 'slot', 'image_ascii', 'created_at', 'updated_at'],
             array_keys($this->getJson('/api/posts')->json('0')),
         );
     }
@@ -153,5 +153,30 @@ class PostTest extends TestCase
         Sanctum::actingAs(User::factory()->create());
 
         $this->deleteJson('/api/posts/not-a-uuid')->assertNotFound();
+    }
+
+    public function test_image_glyphs_are_saved_and_cleared_with_the_post(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $art = ['cols' => 2, 'rows' => 1, 'levels' => '09', 'colours' => '000000ffd479'];
+
+        $id = $this->postJson('/api/posts', ['body' => '![a](x.png)', 'is_private' => false, 'slot' => 0, 'image_ascii' => $art])
+            ->assertCreated()
+            ->assertJsonPath('image_ascii', $art)
+            ->json('id');
+        $this->getJson('/api/posts')->assertJsonPath('0.image_ascii', $art);
+
+        $this->putJson("/api/posts/{$id}", ['body' => 'No image now', 'is_private' => false])
+            ->assertOk()
+            ->assertJsonPath('image_ascii', null);
+    }
+
+    public function test_image_glyphs_must_fill_every_cell(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/posts', ['body' => 'B', 'is_private' => false, 'slot' => 0, 'image_ascii' => ['cols' => 2, 'rows' => 2, 'levels' => '09', 'colours' => '000000ffd479']])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['image_ascii.levels', 'image_ascii.colours']);
     }
 }

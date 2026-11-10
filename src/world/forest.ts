@@ -5,6 +5,7 @@ import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/w
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
 import { createBlankPainting, createOfflinePainting, createPainting, disposeObject } from '@/world/props'
+import { surface } from '@/ascii/surfaces'
 
 const FOG_COLOR = '#9aa58c'
 const PATH_EDGE = 2.6
@@ -82,7 +83,7 @@ export function createForest(posts: Post[] | null, options: { signedIn: boolean 
   // The road runs from the castle gate outward forever; its surface follows the viewer.
   const road = new THREE.Mesh(
     new THREE.PlaneGeometry(3, ROAD_LENGTH),
-    new THREE.MeshStandardMaterial({ color: '#6e5a40', roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: '#6e5a40', roughness: 1, ...surface('dirt') }),
   )
   road.rotation.x = -Math.PI / 2
   road.position.y = 0.01
@@ -113,7 +114,7 @@ export function createForest(posts: Post[] | null, options: { signedIn: boolean 
       poster.position.y = 1.6
       const pole = new THREE.Mesh(
         new THREE.CylinderGeometry(0.05, 0.06, 1.2, 6),
-        new THREE.MeshStandardMaterial({ color: '#4a3a28', roughness: 0.9 }),
+        new THREE.MeshStandardMaterial({ color: '#4a3a28', roughness: 0.9, ...surface('pole') }),
       )
       pole.position.y = 0.6
       pole.castShadow = true
@@ -188,12 +189,12 @@ export function createForest(posts: Post[] | null, options: { signedIn: boolean 
 function createWoods(scene: THREE.Scene, sun: THREE.DirectionalLight) {
   const trunks = new THREE.InstancedMesh(
     new THREE.CylinderGeometry(0.55, 1, 1, 8).translate(0, 0.5, 0),
-    new THREE.MeshStandardMaterial({ color: '#3d2e1e', roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: '#3d2e1e', roughness: 1, ...surface('pole') }),
     TREE_CAPACITY,
   )
   const crowns = new THREE.InstancedMesh(
     crownGeometry(),
-    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, flatShading: true, ...surface('foliage') }),
     TREE_CAPACITY,
   )
   for (const mesh of [trunks, crowns]) {
@@ -209,7 +210,7 @@ function createWoods(scene: THREE.Scene, sun: THREE.DirectionalLight) {
       groundSegments,
       groundSegments,
     ).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, ...surface('grass') }),
   )
   ground.receiveShadow = true
   const groundPositions = ground.geometry.attributes.position as THREE.BufferAttribute
@@ -407,11 +408,13 @@ function createCastleGate() {
     color: '#7d7a70',
     roughness: 0.95,
     flatShading: true,
+    ...surface('stone'),
   })
   const roof = new THREE.MeshStandardMaterial({
     color: '#3f3a4a',
     roughness: 0.8,
     flatShading: true,
+    ...surface('roof'),
   })
   const add = (mesh: THREE.Mesh, x: number, y: number, z: number) => {
     mesh.position.set(x, y, z)
@@ -449,7 +452,7 @@ function createCastleGate() {
 
   const courtyard = new THREE.Mesh(
     new THREE.PlaneGeometry(span, span),
-    new THREE.MeshStandardMaterial({ color: '#6f6a5e', roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: '#6f6a5e', roughness: 1, ...surface('floor') }),
   )
   courtyard.rotation.x = -Math.PI / 2
   courtyard.position.set(0, 0.02, CASTLE_CENTER_Z)

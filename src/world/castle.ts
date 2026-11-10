@@ -3,6 +3,7 @@ import { EYE_HEIGHT, type World } from '@/world/engine'
 import { CastleDoor, DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { seededRandom } from '@/lib/random'
 import { disposeObject } from '@/world/props'
+import { surface } from '@/ascii/surfaces'
 
 const HALF_WIDTH = 9
 const HEIGHT = 12
@@ -31,11 +32,11 @@ export function createCastle(options: { signedIn: boolean }): World {
 
   const centerZ = -LENGTH / 2
   const daisFront = -LENGTH + DAIS_DEPTH
-  const stone = new THREE.MeshStandardMaterial({ color: '#5d5850', roughness: 0.95, flatShading: true })
-  const gold = new THREE.MeshStandardMaterial({ color: '#c9a23f', metalness: 0.8, roughness: 0.35 })
-  const velvet = new THREE.MeshStandardMaterial({ color: '#7a1020', roughness: 1 })
-  const wood = new THREE.MeshStandardMaterial({ color: '#3a2414', roughness: 0.8, flatShading: true })
-  const iron = new THREE.MeshStandardMaterial({ color: '#2b2b2e', metalness: 0.7, roughness: 0.5 })
+  const stone = new THREE.MeshStandardMaterial({ color: '#5d5850', roughness: 0.95, flatShading: true, ...surface('stone') })
+  const gold = new THREE.MeshStandardMaterial({ color: '#c9a23f', metalness: 0.8, roughness: 0.35, ...surface('gold') })
+  const velvet = new THREE.MeshStandardMaterial({ color: '#7a1020', roughness: 1, ...surface('velvet') })
+  const wood = new THREE.MeshStandardMaterial({ color: '#3a2414', roughness: 0.8, flatShading: true, ...surface('wood') })
+  const iron = new THREE.MeshStandardMaterial({ color: '#2b2b2e', metalness: 0.7, roughness: 0.5, ...surface('iron') })
   const random = seededRandom(11)
   const add = (mesh: THREE.Object3D, x: number, y: number, z: number) => {
     mesh.position.set(x, y, z)
@@ -45,7 +46,7 @@ export function createCastle(options: { signedIn: boolean }): World {
 
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(HALF_WIDTH * 2, LENGTH),
-    new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9 }),
+    new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9, ...surface('floor') }),
   )
   floor.rotation.x = -Math.PI / 2
   floor.receiveShadow = true
@@ -80,8 +81,8 @@ export function createCastle(options: { signedIn: boolean }): World {
 
   // Columns with torches face the nave; tall moonlit windows sit high on the outer walls.
   const torches: THREE.PointLight[] = []
-  const flameMaterial = new THREE.MeshBasicMaterial({ color: '#ffb347' })
-  const moonlight = new THREE.MeshBasicMaterial({ color: '#34456b' })
+  const flameMaterial = new THREE.MeshBasicMaterial({ color: '#ffb347', ...surface('flame') })
+  const moonlight = new THREE.MeshBasicMaterial({ color: '#34456b', ...surface('glow') })
   for (let z = -4; z > daisFront - 1; z -= BAY) {
     for (const side of [-1, 1]) {
       const x = side * NAVE_HALF_WIDTH
@@ -136,8 +137,8 @@ export function createCastle(options: { signedIn: boolean }): World {
 
   // Royal banners on the back wall: a great one behind the throne and one to each side.
   // Matte, faintly glowing cloth and gilt: polished gold shows black with nothing to reflect.
-  const bannerVelvet = new THREE.MeshStandardMaterial({ color: '#8a1424', emissive: '#2a0508', roughness: 1 })
-  const gilt = new THREE.MeshStandardMaterial({ color: '#d8b04a', emissive: '#4a3408', roughness: 0.6 })
+  const bannerVelvet = new THREE.MeshStandardMaterial({ color: '#8a1424', emissive: '#2a0508', roughness: 1, ...surface('velvet') })
+  const gilt = new THREE.MeshStandardMaterial({ color: '#d8b04a', emissive: '#4a3408', roughness: 0.6, ...surface('gold') })
   for (const [x, width, height] of [
     [0, 3.2, 7],
     [-6.5, 2, 5.5],
@@ -278,7 +279,7 @@ function createDungeonDoor(stone: THREE.Material, open: boolean) {
   add(new THREE.Mesh(new THREE.BoxGeometry(DUNGEON_PASSAGE_HALF * 2, 0.4, DUNGEON_PASSAGE_DEPTH), stone), 0, DOOR_HEIGHT + 0.2, -DUNGEON_PASSAGE_DEPTH / 2)
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(DUNGEON_PASSAGE_HALF * 2, DUNGEON_PASSAGE_DEPTH),
-    new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9 }),
+    new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9, ...surface('floor') }),
   )
   floor.rotation.x = -Math.PI / 2
   add(floor, 0, 0, -DUNGEON_PASSAGE_DEPTH / 2)
@@ -307,7 +308,7 @@ function createChandelier(iron: THREE.Material, flame: THREE.Material, z: number
   const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 3.5, 6), iron)
   chain.position.y = y + 1.75
   chandelier.add(ring, chain)
-  const wax = new THREE.MeshStandardMaterial({ color: '#efe6cf', roughness: 1 })
+  const wax = new THREE.MeshStandardMaterial({ color: '#efe6cf', roughness: 1, ...surface('pole') })
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2
     const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8), wax)
@@ -348,7 +349,7 @@ function createGate(stone: THREE.Material) {
   )
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(GATE_HALF_WIDTH * 2, GATE_DEPTH),
-    new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9 }),
+    new THREE.MeshStandardMaterial({ color: '#3b3632', roughness: 0.9, ...surface('floor') }),
   )
   floor.rotation.x = -Math.PI / 2
   add(floor, 0, 0, GATE_DEPTH / 2)
@@ -365,7 +366,7 @@ function createGate(stone: THREE.Material) {
   // Unfogged, so the way out still shines from the far end of the hall.
   const daylight = new THREE.Mesh(
     new THREE.PlaneGeometry(GATE_HALF_WIDTH * 2, DOOR_HEIGHT),
-    new THREE.MeshBasicMaterial({ color: '#f4f0dc', fog: false }),
+    new THREE.MeshBasicMaterial({ color: '#f4f0dc', fog: false, ...surface('glow') }),
   )
   daylight.rotation.y = Math.PI
   add(daylight, 0, DOOR_HEIGHT / 2, GATE_DEPTH)
