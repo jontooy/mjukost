@@ -3,8 +3,9 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as THREE from 'three'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import type { Grid } from '@/ascii/grid'
+import { drawCrosshair, drawError, drawLoading, drawPlate } from '@/ascii/overlays'
 import { playDoorOpening } from '@/audio/doorSound'
-import sadMjukost from '@/assets/sad-mjukost.svg'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 import { useMedievalMusic } from '@/composables/useMedievalMusic'
 import { createPost, deletePost, listPosts, updatePost } from '@/lib/posts'
@@ -17,7 +18,7 @@ import type { DoorItem } from '@/world/door'
 import { EYE_HEIGHT, Engine, type Portal, type WorldName } from '@/world/engine'
 import { createForest } from '@/world/forest'
 import { createDungeon } from '@/world/dungeon'
-import type { Field } from '@/world/paperCanvas'
+import type { Field, SlotState } from '@/world/paperCanvas'
 
 type Mode = 'walk' | 'read' | 'write' | 'door'
 
@@ -78,7 +79,7 @@ let engine: Engine
 let controls: FirstPersonControls
 let travelling = false
 let returnTo: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null = null
-let lastDrawn = ''
+let plateState: SlotState | null = null
 const pointer = new THREE.Vector2()
 
 async function enter(name: WorldName, from?: WorldName) {
@@ -131,21 +132,24 @@ function fieldOf(
   return { text, caret: focused && caretOn ? (input.selectionStart ?? text.length) : null }
 }
 
-function drawFocusSurface() {
+function updatePlateState() {
   const door = engine.world?.door
-  if (mode.value !== 'door' || !door) return
+  if (mode.value !== 'door' || !door) {
+    plateState = null
+    return
+  }
   const caretOn = Math.floor(performance.now() / 530) % 2 === 0
   const email = fieldOf(emailInput.value, form.email, caretOn)
   const password = fieldOf(passwordInput.value, form.password, caretOn)
-  const key = JSON.stringify([email, password, status])
-  if (key === lastDrawn) return
-  lastDrawn = key
-  door.render({
-    email,
-    password,
-    status: status.text,
-    statusIsError: status.isError,
-  })
+  plateState = { email, password, status: status.text, statusIsError: status.isError }
+}
+
+function drawOverlay(grid: Grid, camera: THREE.PerspectiveCamera, elapsed: number) {
+  if (loadError.value) return drawError(grid)
+  if (loading.value) return drawLoading(grid, elapsed)
+  if (mode.value === 'walk') drawCrosshair(grid)
+  const plate = engine.world?.door?.targets[0]
+  if (mode.value === 'door' && plate && plateState) drawPlate(grid, camera, plate as THREE.Mesh, plateState)
 }
 
 function onFrame(dt: number) {
@@ -157,7 +161,7 @@ function onFrame(dt: number) {
     const { x, y, z } = engine.camera.position
     coordinates.value = `XYZ: ${x.toFixed(1)} / ${(y - EYE_HEIGHT).toFixed(1)} / ${z.toFixed(1)}`
   }
-  drawFocusSurface()
+  updatePlateState()
 
   const world = engine.world
   if (!world || mode.value !== 'walk' || travelling) return
@@ -191,7 +195,6 @@ async function focusOn(next: Mode, view: { position: THREE.Vector3; lookAt: THRE
     quaternion: engine.camera.quaternion.clone(),
   }
   setStatus('')
-  lastDrawn = ''
   mode.value = next
   travelling = true
   await engine.moveCamera(view.position, view.lookAt, CAMERA_SECONDS)
@@ -633,6 +636,7 @@ onMounted(() => {
   controls = new FirstPersonControls(engine, canvasEl.value!)
   controls.onInteract = () => void interact()
   engine.onFrame = onFrame
+  engine.onOverlay = drawOverlay
   engine.start()
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('pagehide', savePosition)
@@ -681,11 +685,6 @@ onBeforeUnmount(() => {
     />
     <input ref="fileInput" class="hidden" type="file" accept="image/*" multiple @change="onFileChosen" />
 
-    <div
-      v-if="mode === 'walk'"
-      class="pointer-events-none absolute top-1/2 left-1/2 size-1.5 -translate-1/2 rounded-full bg-white/80"
-    />
-
     <div class="absolute top-3 right-3 left-3 flex items-start justify-between gap-3 text-white">
       <div class="flex flex-col gap-1">
         <p v-if="consoleOpen" class="m-0 w-fit bg-black/50 px-2 py-0.5 font-mono text-[0.95rem]">
@@ -716,7 +715,7 @@ onBeforeUnmount(() => {
 
     <p
       v-if="focusLabel"
-      class="pointer-events-none absolute top-[56%] left-1/2 m-0 -translate-x-1/2 rounded bg-black/55 px-3 py-1 text-center font-serif text-white"
+      class="pointer-events-none absolute top-[56%] left-1/2 m-0 -translate-x-1/2 rounded bg-black/55 px-3 py-1 text-center text-white"
     >
       {{ focusLabel }}
       <span v-if="!isTouch" class="text-white/70"> · E</span>
@@ -724,7 +723,7 @@ onBeforeUnmount(() => {
 
     <p
       v-if="hover"
-      class="pointer-events-none absolute m-0 rounded bg-black/65 px-2 py-0.5 font-serif text-[0.9rem] text-white"
+      class="pointer-events-none absolute m-0 rounded bg-black/65 px-2 py-0.5 text-[0.9rem] text-white"
       :style="{ left: `${hover.x + 14}px`, top: `${hover.y + 14}px` }"
     >
       {{ hover.label }}
@@ -773,34 +772,24 @@ onBeforeUnmount(() => {
       <button
         v-if="focusLabel"
         type="button"
-        class="absolute right-6 bottom-8 size-18 rounded-full border-2 border-white/60 bg-black/50 font-serif text-white"
+        class="absolute right-6 bottom-8 size-18 rounded-full border-2 border-white/60 bg-black/50 text-white"
         @click="interact"
       >
         Use
       </button>
     </template>
 
-    <div
-      v-if="loading || loadError"
-      class="absolute inset-0 grid place-items-center bg-black/60 text-center text-white"
-      :role="loadError ? 'alert' : 'status'"
-    >
-      <div v-if="loadError">
-        <img :src="sadMjukost" alt="" class="mx-auto mb-5 h-36 w-auto" />
-        <p class="m-0 text-lg">Ups! Something went wrong...</p>
-        <button
-          type="button"
-          class="mt-5 min-h-11 cursor-pointer rounded-[0.35rem] border border-white/40 bg-black/40 px-4 text-[0.9rem] text-white"
-          @click="enter(worldName)"
-        >
-          Try again
-        </button>
-      </div>
-      <div
-        v-else
-        class="h-7 w-7 animate-spin rounded-full border-2 border-white/30 border-t-white"
-      />
+    <div v-if="loadError" class="absolute inset-0" role="alert">
+      <p class="sr-only">Ups! Something went wrong...</p>
+      <button
+        type="button"
+        class="absolute top-[calc(50%+3rem)] left-1/2 min-h-11 -translate-x-1/2 cursor-pointer border-0 bg-transparent px-3 text-[#ffd479]"
+        @click="enter(worldName)"
+      >
+        [ Try again ]
+      </button>
     </div>
+    <div v-else-if="loading" class="absolute inset-0" role="status"><p class="sr-only">Loading</p></div>
 
     <div
       v-if="reading"
