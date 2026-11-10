@@ -4,6 +4,7 @@ import type { Post } from '@/types/post'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
 import { createBlankPainting, createOfflinePainting, createPainting, disposeObject } from '@/world/props'
+import { surface } from '@/ascii/surfaces'
 
 const HEIGHT = 4
 const CORRIDOR_HALF_WIDTH = 3
@@ -66,16 +67,16 @@ export function createDungeon(posts: Post[] | null): World {
   scene.add(new THREE.AmbientLight('#a8b0a8', 1.6))
 
   const m: Materials = {
-    stone: new THREE.MeshStandardMaterial({ color: '#6a655c', roughness: 0.95, flatShading: true }),
-    floor: new THREE.MeshStandardMaterial({ color: '#4a453c', roughness: 0.85 }),
-    iron: new THREE.MeshStandardMaterial({ color: '#3a3a40', metalness: 0.4, roughness: 0.6 }),
-    wood: new THREE.MeshStandardMaterial({ color: '#5a3e2a', roughness: 0.9, flatShading: true }),
-    bone: new THREE.MeshStandardMaterial({ color: '#cfc5aa', roughness: 0.9 }),
+    stone: new THREE.MeshStandardMaterial({ color: '#6a655c', roughness: 0.95, flatShading: true, ...surface('stone') }),
+    floor: new THREE.MeshStandardMaterial({ color: '#4a453c', roughness: 0.85, ...surface('floor') }),
+    iron: new THREE.MeshStandardMaterial({ color: '#3a3a40', metalness: 0.4, roughness: 0.6, ...surface('iron') }),
+    wood: new THREE.MeshStandardMaterial({ color: '#5a3e2a', roughness: 0.9, flatShading: true, ...surface('wood') }),
+    bone: new THREE.MeshStandardMaterial({ color: '#cfc5aa', roughness: 0.9, ...surface('bone') }),
     socket: new THREE.MeshBasicMaterial({ color: '#000000' }),
-    straw: new THREE.MeshStandardMaterial({ color: '#8a7438', roughness: 1, flatShading: true }),
-    water: new THREE.MeshStandardMaterial({ color: '#0b0d0f', metalness: 0.9, roughness: 0.12 }),
-    flame: new THREE.MeshBasicMaterial({ color: '#ff8a3c' }),
-    eye: new THREE.MeshBasicMaterial({ color: '#ff2a1a', fog: false }),
+    straw: new THREE.MeshStandardMaterial({ color: '#8a7438', roughness: 1, flatShading: true, ...surface('grass') }),
+    water: new THREE.MeshStandardMaterial({ color: '#0b0d0f', metalness: 0.9, roughness: 0.12, ...surface('water') }),
+    flame: new THREE.MeshBasicMaterial({ color: '#ff8a3c', ...surface('flame') }),
+    eye: new THREE.MeshBasicMaterial({ color: '#ff2a1a', fog: false, ...surface('eye') }),
   }
   const add = (mesh: THREE.Object3D, x: number, y: number, z: number) => {
     mesh.position.set(x, y, z)
@@ -120,7 +121,7 @@ export function createDungeon(posts: Post[] | null): World {
   const stairCeiling = new THREE.Mesh(new THREE.PlaneGeometry(STAIR_HALF_WIDTH * 2, stairTop), m.stone)
   stairCeiling.rotation.x = Math.PI / 2
   add(stairCeiling, 0, 7, stairTop / 2)
-  const glow = new THREE.Mesh(new THREE.PlaneGeometry(STAIR_HALF_WIDTH * 2 - 0.4, 2.6), new THREE.MeshBasicMaterial({ color: '#4a2c12' }))
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(STAIR_HALF_WIDTH * 2 - 0.4, 2.6), new THREE.MeshBasicMaterial({ color: '#4a2c12', ...surface('glow') }))
   glow.rotation.y = Math.PI
   add(glow, 0, STAIR_STEPS * STAIR_RISE + 1.3, stairTop - 0.01)
   add(new THREE.PointLight('#ff9a3c', 2.5, 7, 1.6), 0, STAIR_STEPS * STAIR_RISE + 1, stairTop - 1)
