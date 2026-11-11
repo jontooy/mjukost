@@ -43,6 +43,7 @@ const CORNER_TOWERS = [-1, 1].flatMap((side) => [
 ])
 // Two guards flank the gate, close enough that their crossed spears bar the doorway.
 const GATE_GUARDS = [-1, 1].map((side) => ({ x: side * (DOOR_HALF_WIDTH + 0.5), z: 2 }))
+const GUARD_FACE_HEIGHT = 2.3
 // Round obstacles outside the castle box: corner towers and the guards.
 const PILLARS = [
   ...CORNER_TOWERS.map((tower) => ({ ...tower, radius: CORNER_TOWER_RADIUS })),
@@ -163,7 +164,7 @@ export function createForest(options: { signedIn: boolean }): World {
     road.position.z = Math.max(ROAD_LENGTH / 2, viewerZ)
   }
 
-  scene.add(createCastleGate())
+  scene.add(createCastleGate(options.signedIn))
 
   const fireflies = createFireflies(seededRandom(WORLD_SEED))
   scene.add(fireflies.points)
@@ -177,7 +178,21 @@ export function createForest(options: { signedIn: boolean }): World {
     spawn,
     arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI } },
     interactables,
-    portals: [{ position: new THREE.Vector3(0, EYE_HEIGHT, 0.75), radius: 1.3, to: 'castle' }],
+    // Signed-out visitors are stopped a step before the guards and turned to the right one, who speaks.
+    portals: [
+      {
+        position: new THREE.Vector3(0, EYE_HEIGHT, 0.75),
+        radius: 1.3,
+        to: 'castle',
+        dialogue: options.signedIn
+          ? undefined
+          : {
+              id: 'gateGuards',
+              stand: new THREE.Vector3(0, EYE_HEIGHT, GATE_GUARDS[1]!.z + 1),
+              lookAt: new THREE.Vector3(GATE_GUARDS[1]!.x, GUARD_FACE_HEIGHT, GATE_GUARDS[1]!.z),
+            },
+      },
+    ],
     clamp(position) {
       pushOutOfCastle(position)
       woods.collide(position)
@@ -423,7 +438,7 @@ function pushOutOfCastle(position: THREE.Vector3) {
   }
 }
 
-function createCastleGate() {
+function createCastleGate(open: boolean) {
   const castle = new THREE.Group()
   const stone = new THREE.MeshStandardMaterial({
     color: '#7d7a70',
@@ -571,10 +586,10 @@ function createCastleGate() {
   // A faint cold light, so the doors and passage stay readable without a warm glow from inside.
   const light = new THREE.PointLight('#8a96a8', 2, 8)
   light.position.set(0, 2.5, 2)
-  // The gate always stands open; signing in happens at the dungeon door inside.
+  // The gate stands open for signed-in visitors; for everyone else it stays shut behind the guards.
   for (const side of [-1, 1] as const) {
     const leaf = createDoorLeaf(side)
-    swingDoorLeaf(leaf, side, 1)
+    swingDoorLeaf(leaf, side, open ? 1 : 0)
     castle.add(leaf)
   }
   castle.add(hall, light)

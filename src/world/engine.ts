@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { Post } from '@/types/post'
 import type { CastleDoor } from '@/world/door'
+import type { DialogueId } from '@/world/dialogue'
 import { AsciiRenderer } from '@/ascii/renderer'
 import type { Grid } from '@/ascii/grid'
 
@@ -14,10 +15,20 @@ export interface Interactable {
   action: WorldAction
 }
 
+/** A barred way: walking in turns the visitor to the speaker and starts the conversation instead of travelling. */
+export interface PortalDialogue {
+  id: DialogueId
+  /** Where the visitor is stopped. Keep it outside the portal radius so closing the box does not reopen it. */
+  stand: THREE.Vector3
+  /** The speaker's face, which the camera turns to. */
+  lookAt: THREE.Vector3
+}
+
 export interface Portal {
   position: THREE.Vector3
   radius: number
   to: WorldName
+  dialogue?: PortalDialogue
 }
 
 export interface Placement {

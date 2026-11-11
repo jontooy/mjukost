@@ -23,7 +23,7 @@ const DUNGEON_PASSAGE_HALF = DOOR_HALF_WIDTH + 0.3 // wide enough for the open l
 const DUNGEON_PASSAGE_DEPTH = 1.8
 
 // The throne room: a nave of columns and torches, a red carpet up to the king's throne on a dais.
-// It is open to everyone; the private notes are below, behind the sealed dungeon door.
+// Signed-in visitors walk in through the forest gate; the guards turn everyone else away. The private notes are below, behind the sealed dungeon door.
 export function createCastle(options: { signedIn: boolean }): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#0d0b10')

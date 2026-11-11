@@ -2,10 +2,12 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as THREE from 'three'
-import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Grid } from '@/ascii/grid'
 import { drawCrosshair, drawError, drawLoading, drawPlate, drawTitle } from '@/ascii/overlays'
 import { playDoorOpening } from '@/audio/doorSound'
+import { playVoice } from '@/audio/voice'
+import DialogueBox from '@/components/DialogueBox.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 import { useMedievalMusic } from '@/composables/useMedievalMusic'
 import { createPost, deletePost, listPosts, updatePost } from '@/lib/posts'
@@ -15,12 +17,13 @@ import type { Post } from '@/types/post'
 import { createCastle } from '@/world/castle'
 import { FirstPersonControls } from '@/world/controls'
 import type { DoorItem } from '@/world/door'
-import { EYE_HEIGHT, Engine, type Portal, type WorldName } from '@/world/engine'
+import { DIALOGUES, type Dialogue } from '@/world/dialogue'
+import { EYE_HEIGHT, Engine, type Portal, type PortalDialogue, type WorldName } from '@/world/engine'
 import { createForest } from '@/world/forest'
 import { createDungeon } from '@/world/dungeon'
 import type { Field, SlotState } from '@/world/paperCanvas'
 
-type Mode = 'walk' | 'read' | 'write' | 'door'
+type Mode = 'walk' | 'read' | 'write' | 'door' | 'talk'
 
 const WORLD_TITLES: Record<WorldName, string> = {
   forest: 'Mjukost Forest',
@@ -55,10 +58,11 @@ const isTouch = matchMedia('(pointer: coarse)').matches
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const viewEl = ref<HTMLCanvasElement | null>(null)
-// On unless the visitor switched it off before; the choice survives a refresh.
-const asciiOn = ref(localStorage.getItem(ASCII_KEY) !== 'off')
+// Signed-out visitors always see ASCII. Signed in, it is on unless switched off before; the choice survives a refresh.
+const asciiChoice = ref(localStorage.getItem(ASCII_KEY) !== 'off')
+watch(asciiChoice, (on) => localStorage.setItem(ASCII_KEY, on ? 'on' : 'off'))
+const asciiOn = computed(() => !auth.isAuthenticated || asciiChoice.value)
 watch(asciiOn, (on) => {
-  localStorage.setItem(ASCII_KEY, on ? 'on' : 'off')
   engine.ascii.enabled = on
 })
 const titleInput = ref<HTMLInputElement | null>(null)
@@ -76,6 +80,7 @@ const focusLabel = ref<string | null>(null)
 const hover = ref<Hover | null>(null)
 const reading = ref<{ post: Post; html: string } | null>(null)
 const writing = ref<{ post: Post | null; isPrivate: boolean; slot: number } | null>(null)
+const talking = ref<Dialogue | null>(null)
 const busy = ref(false)
 const readError = ref('')
 const joystick = reactive({ active: false, originX: 0, originY: 0, x: 0, y: 0 })
@@ -211,6 +216,10 @@ function onFrame(dt: number) {
   for (const portal of world.portals) {
     const offset = engine.camera.position.clone().sub(portal.position)
     if (offset.length() > portal.radius) continue
+    if (portal.dialogue) {
+      void startDialogue(portal.dialogue)
+      return
+    }
     if (portal.to === 'dungeon' && !auth.isAuthenticated) {
       pushOutOfPortal(portal, offset)
       void startDoor()
@@ -481,6 +490,27 @@ function closeRead() {
   controls.enabled = true
 }
 
+// The visitor is walked to the stand and turned to the speaker, who starts talking at once; the box opens once they face them.
+async function startDialogue({ id, stand, lookAt }: PortalDialogue) {
+  const dialogue = DIALOGUES[id]
+  const voice = dialogue.nodes[dialogue.start]!.voice
+  if (voice) void playVoice(voice)
+  mode.value = 'talk'
+  controls.enabled = false
+  controls.unlock()
+  travelling = true
+  await engine.moveCamera(stand, lookAt, CAMERA_SECONDS)
+  travelling = false
+  talking.value = dialogue
+}
+
+function endDialogue() {
+  talking.value = null
+  mode.value = 'walk'
+  controls.syncFromCamera()
+  controls.enabled = true
+}
+
 async function interact() {
   const action = engine.focused?.action
   if (!action || mode.value !== 'walk') return
@@ -561,10 +591,10 @@ function savePosition() {
   sessionStorage.setItem(POSITION_KEY, JSON.stringify(saved))
 }
 
-// A fresh visit starts in the forest, or before the throne for a signed-in visitor.
+// A fresh visit starts in the forest, or before the throne for a signed-in visitor; signed-out visitors never resume past the gate guards.
 async function restorePosition() {
   const saved = JSON.parse(sessionStorage.getItem(POSITION_KEY) ?? 'null') as SavedPosition | null
-  if (!saved || (saved.world === 'dungeon' && !auth.isAuthenticated)) {
+  if (!saved || (saved.world !== 'forest' && !auth.isAuthenticated)) {
     return enter(auth.isAuthenticated ? 'castle' : 'forest')
   }
   await enter(saved.world)
@@ -748,12 +778,13 @@ onBeforeUnmount(() => {
         <MusicPlayer v-show="worldName !== 'dungeon'" />
         <!-- mousedown.prevent keeps focus off the button, so Space and WASD still reach the world. -->
         <button
+          v-if="auth.isAuthenticated"
           type="button"
           class="min-h-11 cursor-pointer border border-[#c79f5e] bg-black px-3 font-mono text-[14px] text-[#ffd479]"
           :aria-pressed="asciiOn"
           title="Switch ASCII graphics"
           @mousedown.prevent
-          @click="asciiOn = !asciiOn"
+          @click="asciiChoice = !asciiChoice"
         >
           [ ASCII: {{ asciiOn ? 'ON' : 'OFF' }} ]
         </button>
@@ -818,6 +849,7 @@ onBeforeUnmount(() => {
         spellcheck="false"
       />
     </form>
+    <DialogueBox v-if="talking" :dialogue="talking" @end="endDialogue" />
 
     <template v-if="isTouch && mode === 'walk'">
       <div
