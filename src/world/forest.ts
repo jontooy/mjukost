@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { createBlankPainting, createOfflinePainting, createPainting, createPendingPainting, disposeObject, postWall, type PostWall } from '@/world/props'
 import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
+import { createGuard } from '@/world/guard'
 import { seededRandom } from '@/lib/random'
 import { surface } from '@/ascii/surfaces'
 
@@ -40,6 +41,13 @@ const CORNER_TOWERS = [-1, 1].flatMap((side) => [
   { x: side * CASTLE_HALF, z: 0 },
   { x: side * CASTLE_HALF, z: -2 * CASTLE_HALF },
 ])
+// Two guards flank the gate, close enough that their crossed spears bar the doorway.
+const GATE_GUARDS = [-1, 1].map((side) => ({ x: side * (DOOR_HALF_WIDTH + 0.5), z: 2 }))
+// Round obstacles outside the castle box: corner towers and the guards.
+const PILLARS = [
+  ...CORNER_TOWERS.map((tower) => ({ ...tower, radius: CORNER_TOWER_RADIUS })),
+  ...GATE_GUARDS.map((guard) => ({ ...guard, radius: 0.35 })),
+]
 // The player stays outside this box and the corner towers that stick out of it.
 const CASTLE_BOUNDS = {
   minX: -CASTLE_HALF - CORNER_TOWER_RADIUS - 0.5,
@@ -404,14 +412,14 @@ function pushOutOfCastle(position: THREE.Vector3) {
     else if (nearest === left) position.x = minX
     else position.x = maxX
   }
-  for (const tower of CORNER_TOWERS) {
-    const dx = position.x - tower.x
-    const dz = position.z - tower.z
-    const reach = CORNER_TOWER_RADIUS + 0.5
+  for (const pillar of PILLARS) {
+    const dx = position.x - pillar.x
+    const dz = position.z - pillar.z
+    const reach = pillar.radius + 0.5
     const distance = Math.hypot(dx, dz)
     if (distance >= reach || distance === 0) continue
-    position.x = tower.x + (dx / distance) * reach
-    position.z = tower.z + (dz / distance) * reach
+    position.x = pillar.x + (dx / distance) * reach
+    position.z = pillar.z + (dz / distance) * reach
   }
 }
 
@@ -570,6 +578,12 @@ function createCastleGate() {
     castle.add(leaf)
   }
   castle.add(hall, light)
+  for (const { x, z } of GATE_GUARDS) {
+    const guard = createGuard()
+    guard.position.set(x, 0, z)
+    if (x < 0) guard.scale.x *= -1 // mirrored, so both spears are held on the inner side and cross
+    castle.add(guard)
+  }
   return castle
 }
 
