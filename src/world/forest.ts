@@ -1,10 +1,9 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import type { Post } from '@/types/post'
+import { createBlankPainting, createOfflinePainting, createPainting, createPendingPainting, disposeObject, postWall, type PostWall } from '@/world/props'
 import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { seededRandom } from '@/lib/random'
-import { createBlankPainting, createOfflinePainting, createPainting, disposeObject } from '@/world/props'
 import { surface } from '@/ascii/surfaces'
 
 const FOG_COLOR = '#9aa58c'
@@ -61,8 +60,9 @@ interface Tree {
   lightness: number
 }
 
-// `posts` is null when they could not be loaded: then every poster is a crossed-out mjukost.
-export function createForest(posts: Post[] | null, options: { signedIn: boolean }): World {
+// Posters show '...' until setPosts hangs the posts; if those could not be loaded, every poster
+// is a crossed-out mjukost.
+export function createForest(options: { signedIn: boolean }): World {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(FOG_COLOR)
   scene.fog = new THREE.FogExp2(FOG_COLOR, 0.03)
@@ -96,7 +96,7 @@ export function createForest(posts: Post[] | null, options: { signedIn: boolean 
   // end: in each row the right one, as seen walking away from the castle, is the lower slot. A
   // post hangs on the poster of its slot; the rest are empty, and a signed-in visitor can write
   // on any of them. Only rows near the viewer exist.
-  const bySlot = new Map(posts?.map((post) => [post.slot, post]))
+  let wall: PostWall = 'pending'
   const rows = new Map<number, { group: THREE.Group; interactables: Interactable[] }>()
   const interactables: Interactable[] = []
 
@@ -105,12 +105,15 @@ export function createForest(posts: Post[] | null, options: { signedIn: boolean 
     const found: Interactable[] = []
     for (const side of [-1, 1] as const) {
       const slot = row * 2 + (side === -1 ? 0 : 1)
-      const post = bySlot.get(slot)
-      const poster = !posts
-        ? createOfflinePainting('#8a6a3a')
-        : post
-          ? createPainting(post, '#8a6a3a')
-          : createBlankPainting('#8a6a3a')
+      const post = wall instanceof Map ? wall.get(slot) : undefined
+      const poster =
+        wall === 'pending'
+          ? createPendingPainting('#8a6a3a')
+          : wall === 'offline'
+            ? createOfflinePainting('#8a6a3a')
+            : post
+              ? createPainting(post, '#8a6a3a')
+              : createBlankPainting('#8a6a3a')
       poster.position.y = 1.6
       const pole = new THREE.Mesh(
         new THREE.CylinderGeometry(0.05, 0.06, 1.2, 6),
@@ -124,7 +127,7 @@ export function createForest(posts: Post[] | null, options: { signedIn: boolean 
       stand.rotation.y = (-side * Math.PI) / 2
       group.add(stand)
       if (post) found.push({ object: poster, label: post.title || 'Untitled', action: { kind: 'read', post } })
-      else if (posts && options.signedIn) {
+      else if (wall instanceof Map && options.signedIn) {
         found.push({ object: poster, label: 'Write a post here', action: { kind: 'new', isPrivate: false, slot } })
       }
     }
@@ -179,6 +182,16 @@ export function createForest(posts: Post[] | null, options: { signedIn: boolean 
         syncedRow = row
         sync(viewer.z)
       }
+    },
+    setPosts(posts) {
+      wall = postWall(posts)
+      for (const row of rows.values()) {
+        scene.remove(row.group)
+        disposeObject(row.group)
+      }
+      rows.clear()
+      interactables.length = 0
+      syncedRow = NaN
     },
     dispose: () => disposeObject(scene),
   }

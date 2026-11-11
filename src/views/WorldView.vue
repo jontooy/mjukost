@@ -82,8 +82,9 @@ let returnTo: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null =
 let plateState: SlotState | null = null
 const pointer = new THREE.Vector2()
 
-// The cheese tracks the load: eased bites while waiting on the server, capped so there is
-// always some left, then the rest goes in a quick flurry once the world is built.
+// The cheese tracks a load that blocks: eased bites while waiting, capped so there is always
+// some left, then the rest goes in a quick flurry once the world is built. A load done before
+// the next frame never shows it.
 const LOAD_WAIT_SHARE = 0.8
 const LOAD_WAIT_SECONDS = 1
 const LOAD_FINISH_SECONDS = 0.25
@@ -96,23 +97,35 @@ async function enter(name: WorldName, from?: WorldName) {
   loadError.value = false
   loadFinish = 0
   try {
-    // Posts that cannot be loaded leave the world standing, its posters crossed out.
     const world =
       name === 'dungeon'
-        ? createDungeon(await listPosts({ isPrivate: true }).catch(() => null))
+        ? createDungeon()
         : name === 'castle'
           ? createCastle({ signedIn: auth.isAuthenticated })
-          : createForest(await listPosts({ isPrivate: false }).catch(() => null), { signedIn: auth.isAuthenticated })
+          : createForest({ signedIn: auth.isAuthenticated })
     engine.setWorld(world, from)
     controls.syncFromCamera()
     worldName.value = name
-    await engine.animate(LOAD_FINISH_SECONDS, (t) => (loadFinish = t))
+    void refreshPosts()
+    if (loadingSince !== null) await engine.animate(LOAD_FINISH_SECONDS, (t) => (loadFinish = t))
   } catch {
     loadError.value = true
   } finally {
     loading.value = false
     travelling = false
   }
+}
+
+// Posts arrive after the world stands, so the posters fill in late. Posts that cannot be loaded
+// leave the posters crossed out; posts for a world already left, or overtaken by a newer
+// request, are dropped.
+let postsRequest = 0
+async function refreshPosts() {
+  const world = engine.world
+  if (!world?.setPosts) return
+  const request = ++postsRequest
+  const posts = await listPosts({ isPrivate: world.name === 'dungeon' }).catch(() => null)
+  if (request === postsRequest && engine.world === world) world.setPosts(posts)
 }
 
 async function rebuild() {
@@ -332,7 +345,7 @@ async function seal() {
       await createPost({ title, body, is_private: active.isPrivate, slot: active.slot })
     }
     endWriting()
-    await rebuild()
+    await refreshPosts()
   } catch (error) {
     setStatus(errorText(error, 'The post could not be written'), true)
   } finally {
@@ -467,7 +480,7 @@ async function onDelete(post: Post) {
   try {
     await deletePost(post.id)
     closeRead()
-    await rebuild()
+    await refreshPosts()
   } catch (error) {
     readError.value = errorText(error, 'Failed to delete post')
   } finally {

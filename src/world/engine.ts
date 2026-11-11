@@ -35,6 +35,8 @@ export interface World {
   portals: Portal[]
   clamp(position: THREE.Vector3): void
   update?(dt: number, elapsed: number, viewer: THREE.Vector3): void
+  /** Hang the posts once they arrive; null when they could not be loaded. Worlds without posters omit it. */
+  setPosts?(posts: Post[] | null): void
   dispose(): void
 }
 

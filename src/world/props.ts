@@ -26,6 +26,19 @@ export function createOfflinePainting(frameColor: THREE.ColorRepresentation) {
   )
 }
 
+// A poster whose post is still on its way.
+export function createPendingPainting(frameColor: THREE.ColorRepresentation) {
+  return framed([{ text: '...', colour: DATE }], frameColor)
+}
+
+// What hangs on the posters: the posts by slot, or why there are none to show yet.
+export type PostWall = Map<number, Post> | 'pending' | 'offline'
+
+// `posts` null means they could not be loaded.
+export function postWall(posts: Post[] | null): PostWall {
+  return posts ? new Map(posts.map((post) => [post.slot, post])) : 'offline'
+}
+
 function posterText(post: Post): WorldText {
   const lines: WorldText = []
   if (post.title) lines.push({ text: post.title, colour: TITLE })
