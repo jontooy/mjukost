@@ -4,7 +4,7 @@ import { marked } from 'marked'
 import * as THREE from 'three'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Grid } from '@/ascii/grid'
-import { drawCrosshair, drawError, drawLoading, drawPlate } from '@/ascii/overlays'
+import { drawCrosshair, drawError, drawLoading, drawPlate, drawTitle } from '@/ascii/overlays'
 import { playDoorOpening } from '@/audio/doorSound'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 import { useMedievalMusic } from '@/composables/useMedievalMusic'
@@ -21,6 +21,12 @@ import { createDungeon } from '@/world/dungeon'
 import type { Field, SlotState } from '@/world/paperCanvas'
 
 type Mode = 'walk' | 'read' | 'write' | 'door'
+
+const WORLD_TITLES: Record<WorldName, string> = {
+  forest: 'Mjukost Forest',
+  castle: 'Hall of Cream Cheese',
+  dungeon: 'The Cheese Cave',
+}
 
 interface Hover {
   label: string
@@ -69,7 +75,6 @@ const consoleOpen = ref(false)
 const consoleLine = ref('')
 const consoleMessage = ref('')
 const consoleInput = ref<HTMLInputElement | null>(null)
-const coordinates = ref('')
 const flying = ref(false)
 
 const form = reactive({ title: '', body: '', email: '', password: '' })
@@ -175,9 +180,15 @@ function drawOverlay(grid: Grid, camera: THREE.PerspectiveCamera, elapsed: numbe
     const fraction = LOAD_WAIT_SHARE * (1 - Math.exp(-waited / LOAD_WAIT_SECONDS))
     return drawLoading(grid, fraction + (1 - fraction) * loadFinish)
   }
+  const { x, y, z } = camera.position
+  const coordinates = consoleOpen.value
+    ? `XYZ: ${x.toFixed(1)} / ${(y - EYE_HEIGHT).toFixed(1)} / ${z.toFixed(1)}`
+    : null
+  drawTitle(grid, WORLD_TITLES[worldName.value], coordinates)
   if (mode.value === 'walk') drawCrosshair(grid)
   const plate = engine.world?.door?.targets[0]
-  if (mode.value === 'door' && plate && plateState) drawPlate(grid, camera, plate as THREE.Mesh, plateState)
+  if (mode.value === 'door' && plate && plateState)
+    drawPlate(grid, camera, plate as THREE.Mesh, plateState)
 }
 
 function onFrame(dt: number) {
@@ -185,10 +196,6 @@ function onFrame(dt: number) {
   locked.value = controls.locked
   Object.assign(joystick, controls.joystick)
   focusLabel.value = mode.value === 'walk' ? (engine.focused?.label ?? null) : null
-  if (consoleOpen.value) {
-    const { x, y, z } = engine.camera.position
-    coordinates.value = `XYZ: ${x.toFixed(1)} / ${(y - EYE_HEIGHT).toFixed(1)} / ${z.toFixed(1)}`
-  }
   updatePlateState()
 
   const world = engine.world
@@ -301,7 +308,10 @@ async function addImages(files: File[]) {
     const images: string[] = []
     for (const file of files) {
       const url = await uploadPostImage(file, { isPrivate: true })
-      const alt = file.name.replace(/\.[^.]+$/, '').replace(/[[\]_-]+/g, ' ').trim()
+      const alt = file.name
+        .replace(/\.[^.]+$/, '')
+        .replace(/[[\]_-]+/g, ' ')
+        .trim()
       images.push(`![${alt}](${url})`)
     }
     const inserted = images.join(' ')
@@ -320,7 +330,9 @@ async function addImages(files: File[]) {
 
 function onPaste(event: ClipboardEvent) {
   if (!writing.value?.isPrivate) return
-  const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'))
+  const files = [...(event.clipboardData?.files ?? [])].filter((file) =>
+    file.type.startsWith('image/'),
+  )
   if (files.length === 0) return
   event.preventDefault()
   void addImages(files)
@@ -711,21 +723,23 @@ onBeforeUnmount(() => {
       aria-label="Password"
       @keydown.enter.prevent="turnKey"
     />
-    <input ref="fileInput" class="hidden" type="file" accept="image/*" multiple @change="onFileChosen" />
+    <input
+      ref="fileInput"
+      class="hidden"
+      type="file"
+      accept="image/*"
+      multiple
+      @change="onFileChosen"
+    />
 
     <div class="absolute top-3 right-3 left-3 flex items-start justify-between gap-3 text-white">
-      <div class="flex flex-col gap-1">
-        <p v-if="consoleOpen" class="m-0 w-fit bg-black/50 px-2 py-0.5 font-mono text-[0.95rem]">
-          {{ coordinates }}
-        </p>
-      </div>
       <div class="ml-auto flex gap-2">
         <!-- Hidden, not unmounted: the dungeon is silent, but the music must stay ready above. -->
         <MusicPlayer v-show="worldName !== 'dungeon'" />
         <button
           v-if="mode === 'door'"
           type="button"
-          class="min-h-11 cursor-pointer rounded-[0.35rem] border border-white/40 bg-black/40 px-3 text-[0.85rem] text-white"
+          class="min-h-11 cursor-pointer border border-[#c79f5e] bg-black px-3 font-mono text-[14px] text-[#ffd479]"
           @click="stepBack"
         >
           Step back
@@ -733,7 +747,7 @@ onBeforeUnmount(() => {
         <button
           v-if="auth.isAuthenticated && mode === 'walk'"
           type="button"
-          class="min-h-11 cursor-pointer rounded-[0.35rem] border border-white/40 bg-black/40 px-3 text-[0.85rem] text-white"
+          class="min-h-11 cursor-pointer border border-[#c79f5e] bg-black px-3 font-mono text-[14px] text-[#ffd479]"
           @click="onSignOut"
         >
           Sign out
@@ -817,7 +831,9 @@ onBeforeUnmount(() => {
         [ Try again ]
       </button>
     </div>
-    <div v-else-if="loading" class="absolute inset-0" role="status"><p class="sr-only">Loading</p></div>
+    <div v-else-if="loading" class="absolute inset-0" role="status">
+      <p class="sr-only">Loading</p>
+    </div>
 
     <div
       v-if="reading"
@@ -902,7 +918,10 @@ onBeforeUnmount(() => {
           :readonly="busy"
           @paste="onPaste"
         />
-        <div v-if="writing.isPrivate" class="mt-2 flex items-center gap-3 text-[0.85rem] text-subtle">
+        <div
+          v-if="writing.isPrivate"
+          class="mt-2 flex items-center gap-3 text-[0.85rem] text-subtle"
+        >
           <button
             type="button"
             class="min-h-11 cursor-pointer rounded-[0.35rem] border border-border bg-surface px-3 text-[0.85rem] text-ink disabled:opacity-60"

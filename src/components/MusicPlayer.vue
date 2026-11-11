@@ -12,7 +12,7 @@ onBeforeUnmount(() => music.dispose())
 <template>
   <button
     type="button"
-    class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-[0.35rem] border border-white/40 bg-black/40 text-white"
+    class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center border border-[#c79f5e] bg-black font-mono text-[14px] text-[#ffd479]"
     :aria-label="music.isPlaying.value ? 'Mute music' : 'Play music'"
     :title="music.isPlaying.value ? 'Mute music' : 'Play music'"
     @mousedown.prevent

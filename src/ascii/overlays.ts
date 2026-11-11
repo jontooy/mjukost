@@ -120,6 +120,20 @@ export function drawError(grid: Grid): void {
   grid.centreText(mid + 1, 'Ups! Something went wrong...', ERROR)
 }
 
+/** The world's name in a box in the top left, with `coordinates` under it when given. */
+export function drawTitle(grid: Grid, title: string, coordinates: string | null): void {
+  const line = '─'.repeat(title.length + 4)
+  grid.clearBox(1, 1, title.length + 6, 3)
+  grid.text(1, 1, `┌${line}┐`, EDGE)
+  grid.text(1, 2, '│', EDGE)
+  grid.text(4, 2, title, AMBER)
+  grid.text(title.length + 6, 2, '│', EDGE)
+  grid.text(1, 3, `└${line}┘`, EDGE)
+  if (coordinates === null) return
+  grid.clearBox(1, 5, coordinates.length + 2, 1)
+  grid.text(2, 5, coordinates, INK)
+}
+
 export function drawCrosshair(grid: Grid): void {
   grid.text(Math.floor(grid.cols / 2), Math.floor(grid.rows / 2), '+', INK)
 }
