@@ -72,8 +72,8 @@ export class Engine {
   private frame = 0
   private animations: Animation[] = []
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.ascii = new AsciiRenderer(canvas)
+  constructor(canvas: HTMLCanvasElement, viewCanvas: HTMLCanvasElement) {
+    this.ascii = new AsciiRenderer(canvas, viewCanvas)
     this.camera.rotation.order = 'YXZ'
     this.resize()
     window.addEventListener('resize', this.resize)
@@ -154,7 +154,7 @@ export class Engine {
       this.ascii.screen.clear()
     }
     this.onOverlay?.(this.ascii.screen, this.camera, elapsed)
-    this.ascii.screen.blit()
+    this.ascii.screen.blit(this.ascii.enabled || !world) // no world: nothing below to show through
   }
 
   private runAnimations(dt: number) {

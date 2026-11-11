@@ -13,7 +13,7 @@ export class Screen extends Grid {
 
   constructor(readonly canvas: HTMLCanvasElement) {
     super()
-    this.ctx = canvas.getContext('2d', { alpha: false })!
+    this.ctx = canvas.getContext('2d')!
     this.resize()
   }
 
@@ -34,11 +34,16 @@ export class Screen extends Grid {
     this.allocate(Math.max(24, Math.floor(w / this.cw)), Math.max(12, Math.floor(h / this.ch)))
   }
 
-  blit(): void {
+  /** Draws the grid; when not `opaque`, empty cells stay see-through so a 3D view below shows. */
+  blit(opaque: boolean): void {
     const { ctx, cols, rows, cw, ch, bg, glyph, colour } = this
 
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, this.width, this.height)
+    if (opaque) {
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, this.width, this.height)
+    } else {
+      ctx.clearRect(0, 0, this.width, this.height)
+    }
 
     // Pass one: batch runs of equal non-null bg into one fillRect per row segment.
     for (let y = 0; y < rows; y++) {

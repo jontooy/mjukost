@@ -20,6 +20,11 @@ export interface FrameInput {
 
 const sample: CellSample = { wx: 0, wy: 0, wz: 0, cellsPerMetre: 0, t: 0 }
 
+/** Depth in metres of the ID pass pixel at byte offset `p`. */
+export function idDepth(ids: Uint8Array, p: number): number {
+  return (((ids[p + 1]! << 8) | ids[p + 2]!) / 65535) * DEPTH_RANGE
+}
+
 /** Turns the read-back colour and ID passes into glyphs. The caller clears the grid first. */
 export function convertFrame(grid: Grid, input: FrameInput): void {
   const { cols, rows } = grid
@@ -31,7 +36,7 @@ export function convertFrame(grid: Grid, input: FrameInput): void {
       const i = y * cols + x
       const p = ((rows - 1 - y) * cols + x) * 4
       const id = ids[p]!
-      const d = (((ids[p + 1]! << 8) | ids[p + 2]!) / 65535) * DEPTH_RANGE
+      const d = idDepth(ids, p)
       grid.depth[i] = d
       const surface = SURFACES[id] ?? SURFACES[1]!
       let r = colour[p]!

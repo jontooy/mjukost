@@ -47,12 +47,20 @@ interface SavedPosition {
 const PORTAL_PUSHBACK = 1.5
 const CAMERA_SECONDS = 0.9
 const POSITION_KEY = 'mjukost-position'
+const ASCII_KEY = 'mjukost-ascii'
 
 const auth = useAuthStore()
 const music = useMedievalMusic()
 const isTouch = matchMedia('(pointer: coarse)').matches
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
+const viewEl = ref<HTMLCanvasElement | null>(null)
+// On unless the visitor switched it off before; the choice survives a refresh.
+const asciiOn = ref(localStorage.getItem(ASCII_KEY) !== 'off')
+watch(asciiOn, (on) => {
+  localStorage.setItem(ASCII_KEY, on ? 'on' : 'off')
+  engine.ascii.enabled = on
+})
 const titleInput = ref<HTMLInputElement | null>(null)
 const bodyInput = ref<HTMLTextAreaElement | null>(null)
 const emailInput = ref<HTMLInputElement | null>(null)
@@ -672,7 +680,8 @@ watch(worldName, (name) => {
 watch(flying, (on) => (controls.flying = on))
 
 onMounted(() => {
-  engine = new Engine(canvasEl.value!)
+  engine = new Engine(canvasEl.value!, viewEl.value!)
+  engine.ascii.enabled = asciiOn.value
   controls = new FirstPersonControls(engine, canvasEl.value!)
   controls.onInteract = () => void interact()
   engine.onFrame = onFrame
@@ -694,9 +703,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="fixed inset-0 overflow-hidden bg-black select-none">
+    <canvas v-show="!asciiOn" ref="viewEl" class="absolute inset-0 block h-full w-full" aria-hidden="true" />
     <canvas
       ref="canvasEl"
-      class="block h-full w-full touch-none"
+      class="relative block h-full w-full touch-none"
       :class="hover ? 'cursor-pointer' : ''"
       @pointermove="onPointerMove"
       @click="onCanvasClick"
@@ -736,6 +746,17 @@ onBeforeUnmount(() => {
       <div class="ml-auto flex gap-2">
         <!-- Hidden, not unmounted: the dungeon is silent, but the music must stay ready above. -->
         <MusicPlayer v-show="worldName !== 'dungeon'" />
+        <!-- mousedown.prevent keeps focus off the button, so Space and WASD still reach the world. -->
+        <button
+          type="button"
+          class="min-h-11 cursor-pointer border border-[#c79f5e] bg-black px-3 font-mono text-[14px] text-[#ffd479]"
+          :aria-pressed="asciiOn"
+          title="Switch ASCII graphics"
+          @mousedown.prevent
+          @click="asciiOn = !asciiOn"
+        >
+          [ ASCII: {{ asciiOn ? 'ON' : 'OFF' }} ]
+        </button>
         <button
           v-if="mode === 'door'"
           type="button"
