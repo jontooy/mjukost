@@ -1,10 +1,12 @@
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import * as Tone from 'tone'
 import { MedievalEngine, type EngineSettings } from '@/audio/engine'
 import type { WorldName } from '@/world/engine'
 
-const STORAGE_KEY = 'mjukost-music'
-const VOLUME = 0.5
+const STORAGE_KEY = 'mjukost-music-level'
+export const MAX_LEVEL = 5
+const DEFAULT_LEVEL = 3
+const GAIN_PER_LEVEL = 0.15
 // The dungeon has no music: only silence down there.
 const WORLD_PRESETS: Record<WorldName, (Omit<EngineSettings, 'seed'> & { reverbWet: number }) | null> = {
   forest: { mode: 'dorian', danceForm: 'estampie', tempo: 132, reverbWet: 0.25 },
@@ -12,9 +14,16 @@ const WORLD_PRESETS: Record<WorldName, (Omit<EngineSettings, 'seed'> & { reverbW
   dungeon: null,
 }
 
-// Off unless the visitor turned it on before; the choice survives a refresh.
-const isPlaying = ref(localStorage.getItem(STORAGE_KEY) === 'on')
-watch(isPlaying, (on) => localStorage.setItem(STORAGE_KEY, on ? 'on' : 'off'))
+// Off unless the visitor turned it up before; the level survives a refresh.
+const level = ref(Math.min(MAX_LEVEL, Math.max(0, Number(localStorage.getItem(STORAGE_KEY)) || 0)))
+const isPlaying = computed(() => level.value > 0)
+let lastLevel = level.value || DEFAULT_LEVEL // what "on" restores after a mute
+watch(level, (n) => {
+  localStorage.setItem(STORAGE_KEY, String(n))
+  if (n > 0) lastLevel = n
+})
+
+const gain = (n: number) => n * GAIN_PER_LEVEL
 
 const settings: EngineSettings = {
   mode: 'dorian',
@@ -30,10 +39,11 @@ let creating: Promise<MedievalEngine> | null = null
 
 async function startEngine() {
   await Tone.start() // first await, so it runs inside the user gesture
-  const pending = (creating ??= MedievalEngine.create(VOLUME, reverbWet))
+  const pending = (creating ??= MedievalEngine.create(gain(level.value), reverbWet))
   const created = await pending
   if (creating !== pending) return created.dispose() // disposed while loading
   engine = created
+  engine.setVolume(gain(level.value)) // the level may have changed while it loaded
   if (isPlaying.value && !silent) engine.start(settings)
 }
 
@@ -52,21 +62,19 @@ function resumeOnGesture() {
 resumeOnGesture()
 
 export function useMedievalMusic() {
-  function play() {
-    if (isPlaying.value) return
-    isPlaying.value = true
-    void startEngine()
+  function setLevel(n: number) {
+    const next = Math.min(MAX_LEVEL, Math.max(0, n))
+    if (next === level.value) return
+    const wasPlaying = isPlaying.value
+    level.value = next
+    if (next === 0) return engine?.stop()
+    engine?.setVolume(gain(next))
+    if (!wasPlaying) void startEngine()
   }
 
-  function stop() {
-    isPlaying.value = false
-    engine?.stop()
-  }
-
-  function toggle() {
-    if (isPlaying.value) stop()
-    else play()
-  }
+  const play = () => setLevel(level.value || lastLevel)
+  const stop = () => setLevel(0)
+  const toggle = () => setLevel(level.value ? 0 : lastLevel)
 
   function applyWorldPreset(world: WorldName) {
     const preset = WORLD_PRESETS[world]
@@ -80,7 +88,7 @@ export function useMedievalMusic() {
     if (isPlaying.value) engine?.restart(settings)
   }
 
-  // Tears down the audio but keeps the visitor's on/off choice.
+  // Tears down the audio but keeps the visitor's volume level.
   function dispose() {
     engine?.dispose()
     engine = null
@@ -88,5 +96,5 @@ export function useMedievalMusic() {
     resumeOnGesture()
   }
 
-  return { isPlaying, play, stop, toggle, applyWorldPreset, dispose }
+  return { level, isPlaying, setLevel, play, stop, toggle, applyWorldPreset, dispose }
 }
