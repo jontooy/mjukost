@@ -82,10 +82,19 @@ let returnTo: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null =
 let plateState: SlotState | null = null
 const pointer = new THREE.Vector2()
 
+// The cheese tracks the load: eased bites while waiting on the server, capped so there is
+// always some left, then the rest goes in a quick flurry once the world is built.
+const LOAD_WAIT_SHARE = 0.8
+const LOAD_WAIT_SECONDS = 1
+const LOAD_FINISH_SECONDS = 0.25
+let loadingSince: number | null = null
+let loadFinish = 0
+
 async function enter(name: WorldName, from?: WorldName) {
   travelling = true
   loading.value = true
   loadError.value = false
+  loadFinish = 0
   try {
     // Posts that cannot be loaded leave the world standing, its posters crossed out.
     const world =
@@ -97,6 +106,7 @@ async function enter(name: WorldName, from?: WorldName) {
     engine.setWorld(world, from)
     controls.syncFromCamera()
     worldName.value = name
+    await engine.animate(LOAD_FINISH_SECONDS, (t) => (loadFinish = t))
   } catch {
     loadError.value = true
   } finally {
@@ -145,8 +155,13 @@ function updatePlateState() {
 }
 
 function drawOverlay(grid: Grid, camera: THREE.PerspectiveCamera, elapsed: number) {
+  if (!loading.value) loadingSince = null
   if (loadError.value) return drawError(grid)
-  if (loading.value) return drawLoading(grid, elapsed)
+  if (loading.value) {
+    const waited = elapsed - (loadingSince ??= elapsed)
+    const fraction = LOAD_WAIT_SHARE * (1 - Math.exp(-waited / LOAD_WAIT_SECONDS))
+    return drawLoading(grid, fraction + (1 - fraction) * loadFinish)
+  }
   if (mode.value === 'walk') drawCrosshair(grid)
   const plate = engine.world?.door?.targets[0]
   if (mode.value === 'door' && plate && plateState) drawPlate(grid, camera, plate as THREE.Mesh, plateState)

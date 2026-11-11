@@ -11,7 +11,66 @@ const ERROR = '#ff8a6c'
 const CHEESE = '#f3af1a'
 const DOTS = '#14100a'
 
-const SPIN = ['.  ', '.. ', '...', ' ..', '  .', '   ']
+// A wedge after the reference sketch: sloped top face, holes, two old bites in the rind.
+const CHEESE_ART = [
+  '                 __.......__',
+  '           _.--\'\'::::::::::::::\'\'--._',
+  '      _.-\'\'::::::(  )::::::::::(    )::\'\'-._',
+  '  _.-\':::::::::::::::::::::::::::::::::::::::\'-._',
+  ' |\'\'\'\'\'\'\'\'\'\'--------........_____________________|',
+  ' |:::::::::::::::::::::::::::::::::::(      )::::|',
+  ' ):::::::::::::::(    ):::::::::::::::(    ):::::|',
+  ' (::::::::::::::(      ):::::::::::::::::::::::::|',
+  ' ):::::::::::::::(    ):::::::::::(    ):::::::::|',
+  ' |:::::(   )::::::::::::::::::::::(      ):::::::|',
+  ' |::::::::::::::::::::::::::::::::::(    ):::::::|',
+  ' |_____________________/    \\____________________|',
+]
+const CHEESE_W = Math.max(...CHEESE_ART.map((line) => line.length))
+const RIND = new Set('_.-\'|()/\\')
+
+// Bites eat from the right, alternating high and low; everything right of the latest bite is gone.
+const BITE_STEP = 5
+const BITE_RADIUS = 4
+const BITES = Math.ceil((CHEESE_W + BITE_RADIUS * 2) / BITE_STEP) + 1
+
+function eaten(x: number, y: number, bites: number): boolean {
+  if (bites === 0) return false
+  if (x >= CHEESE_W + BITE_RADIUS - (bites - 1) * BITE_STEP) return true
+  for (let i = 0; i < bites; i++) {
+    const dx = (x - (CHEESE_W + BITE_RADIUS - i * BITE_STEP)) / 2
+    const dy = y - (i % 2 === 0 ? 3 : 8)
+    if (dx * dx + dy * dy <= BITE_RADIUS * BITE_RADIUS) return true
+  }
+  return false
+}
+
+// Share of the cheese gone after each bite count, so `fraction` maps to eaten area, not bite count.
+const EATEN_SHARE = Array.from({ length: BITES + 1 }, (_, bites) => {
+  let total = 0
+  let gone = 0
+  CHEESE_ART.forEach((line, y) => {
+    for (let x = 0; x < line.length; x++) {
+      if (line[x] === ' ') continue
+      total++
+      if (eaten(x, y, bites)) gone++
+    }
+  })
+  return gone / total
+})
+
+function drawCheese(grid: Grid, x0: number, y0: number, fraction: number): void {
+  let bites = 0
+  while (bites < BITES && EATEN_SHARE[bites + 1]! <= fraction) bites++
+  for (let y = 0; y < CHEESE_ART.length; y++) {
+    const line = CHEESE_ART[y]!
+    for (let x = 0; x < line.length; x++) {
+      const ch = line[x]!
+      if (ch === ' ' || eaten(x, y, bites)) continue
+      grid.text(x0 + x, y0 + y, ch, RIND.has(ch) ? EDGE : CHEESE)
+    }
+  }
+}
 
 export const BANNER = [
   ' __  __      _   _   _   _  __   ___    ___   _____ ',
@@ -32,9 +91,10 @@ export const SAD_MJUKOST = [
   '   (____________________|/ ',
 ]
 
-export function drawLoading(grid: Grid, t: number): void {
+/** `fraction` is how much of the load is done: 0 shows a whole cheese, 1 an empty plate. */
+export function drawLoading(grid: Grid, fraction: number): void {
   grid.clear()
-  const mid = Math.floor(grid.rows / 2)
+  const top = Math.floor((grid.rows - CHEESE_ART.length) / 2) + 3
   for (let y = 0; y < grid.rows; y += 2) {
     for (let x = (y % 4 === 0 ? 0 : 3); x < grid.cols; x += 6) {
       grid.text(x, y, '.', DOTS)
@@ -42,12 +102,12 @@ export function drawLoading(grid: Grid, t: number): void {
   }
   if (grid.cols >= 56) {
     const x0 = Math.floor((grid.cols - 52) / 2)
-    grid.clearBox(x0, mid - 5, 52, 4)
+    grid.clearBox(x0, top - 6, 52, 4)
     for (let i = 0; i < BANNER.length; i++) {
-      grid.text(x0, mid - 5 + i, BANNER[i]!, EDGE)
+      grid.text(x0, top - 6 + i, BANNER[i]!, EDGE)
     }
   }
-  grid.centreText(mid + 1, 'Loading' + SPIN[Math.floor(t * 6) % 6]!, INK)
+  drawCheese(grid, Math.floor((grid.cols - CHEESE_W) / 2), top, fraction)
 }
 
 export function drawError(grid: Grid): void {
