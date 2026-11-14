@@ -21,6 +21,7 @@ import { DIALOGUES, type Dialogue } from '@/world/dialogue'
 import { EYE_HEIGHT, Engine, type Portal, type PortalDialogue, type WorldName } from '@/world/engine'
 import { createForest } from '@/world/forest'
 import { createDungeon } from '@/world/dungeon'
+import { createColosseum } from '@/world/colosseum'
 import type { Field, SlotState } from '@/world/paperCanvas'
 
 type Mode = 'walk' | 'read' | 'write' | 'door' | 'talk'
@@ -29,6 +30,7 @@ const WORLD_TITLES: Record<WorldName, string> = {
   forest: 'Mjukost Forest',
   castle: 'Hall of Cream Cheese',
   dungeon: 'The Cheese Cave',
+  colosseum: 'The Mjukost Colosseum',
 }
 
 interface Hover {
@@ -120,7 +122,9 @@ async function enter(name: WorldName, from?: WorldName) {
         ? createDungeon()
         : name === 'castle'
           ? createCastle({ signedIn: auth.isAuthenticated })
-          : createForest({ signedIn: auth.isAuthenticated })
+          : name === 'colosseum'
+            ? createColosseum()
+            : createForest({ signedIn: auth.isAuthenticated })
     engine.setWorld(world, from)
     controls.syncFromCamera()
     worldName.value = name
@@ -596,7 +600,7 @@ function savePosition() {
 // A fresh visit starts in the forest, or before the throne for a signed-in visitor; signed-out visitors never resume past the gate guards.
 async function restorePosition() {
   const saved = JSON.parse(sessionStorage.getItem(POSITION_KEY) ?? 'null') as SavedPosition | null
-  if (!saved || (saved.world !== 'forest' && !auth.isAuthenticated)) {
+  if (!saved || ((saved.world === 'castle' || saved.world === 'dungeon') && !auth.isAuthenticated)) {
     return enter(auth.isAuthenticated ? 'castle' : 'forest')
   }
   await enter(saved.world)

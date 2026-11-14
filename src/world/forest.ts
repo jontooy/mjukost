@@ -4,7 +4,7 @@ import { createBlankPainting, createOfflinePainting, createPainting, createPendi
 import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { createGuard } from '@/world/guard'
-import { createArena, nearArena, pushOutOfArena } from '@/world/arena'
+import { GATE_X, GATE_Z, createArena, nearArena, pushOutOfArena } from '@/world/arena'
 import { FOREST_MAP } from '@/world/forestMap'
 import { seededRandom } from '@/lib/random'
 import { surface } from '@/ascii/surfaces'
@@ -180,7 +180,11 @@ export function createForest(options: { signedIn: boolean }): World {
     scene,
     spawn,
     map: FOREST_MAP,
-    arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI } },
+    arrivals: {
+      castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI },
+      // Out of the Colosseum's gate, facing down the path.
+      colosseum: { position: new THREE.Vector3(GATE_X + 3, EYE_HEIGHT, GATE_Z), yaw: -Math.PI / 2 },
+    },
     interactables,
     // Signed-out visitors are stopped a step before the guards and turned to the right one, who speaks.
     portals: [
@@ -196,6 +200,7 @@ export function createForest(options: { signedIn: boolean }): World {
               lookAt: new THREE.Vector3(GATE_GUARDS[1]!.x, GUARD_FACE_HEIGHT, GATE_GUARDS[1]!.z),
             },
       },
+      { position: new THREE.Vector3(GATE_X, EYE_HEIGHT, GATE_Z), radius: 1.3, to: 'colosseum' },
     ],
     clamp(position) {
       pushOutOfCastle(position)

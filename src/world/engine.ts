@@ -7,7 +7,7 @@ import type { Grid } from '@/ascii/grid'
 
 export type WorldAction = { kind: 'read'; post: Post } | { kind: 'new'; isPrivate: boolean; slot: number }
 
-export type WorldName = 'forest' | 'castle' | 'dungeon'
+export type WorldName = 'forest' | 'castle' | 'dungeon' | 'colosseum'
 
 export interface Interactable {
   object: THREE.Object3D
