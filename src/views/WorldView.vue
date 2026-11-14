@@ -30,7 +30,7 @@ const WORLD_TITLES: Record<WorldName, string> = {
   forest: 'Mjukost Forest',
   castle: 'Hall of Cream Cheese',
   dungeon: 'The Cheese Cave',
-  colosseum: 'The Mjukost Colosseum',
+  colosseum: 'The Colocheeseum',
 }
 
 interface Hover {

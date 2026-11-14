@@ -57,10 +57,11 @@ const ellipsePoint = (d: number, t: number) =>
   new THREE.Vector3((ARENA_A + d) * Math.sin(t), 0, (ARENA_B + d) * Math.cos(t))
 const bayEdge = (k: number) => Math.PI / 2 + ((k - 0.5) * 2 * Math.PI) / BAYS
 
-// Bay k's chord on the ellipse at offset d: local x runs along the wall, y up, +z outward.
-function bayFrame(k: number, d: number) {
+// The chord across `span` bays from bay k on the ellipse at offset d: local x runs along the
+// wall, y up, +z outward.
+function bayFrame(k: number, d: number, span = 1) {
   const a = ellipsePoint(d, bayEdge(k))
-  const b = ellipsePoint(d, bayEdge(k + 1))
+  const b = ellipsePoint(d, bayEdge(k + span))
   const width = a.distanceTo(b)
   const matrix = new THREE.Matrix4()
     .makeRotationY(Math.atan2(a.z - b.z, b.x - a.x))
@@ -90,15 +91,15 @@ function archShape(radius: number, top: number): THREE.Shape {
   return shape
 }
 
-// A storey of wall `width` wide with an arch cut up from its foot.
-function archedWall(width: number): THREE.Shape {
+// Wall `width` wide and `height` tall with an arch cut up from its foot, a storey's by default.
+function archedWall(width: number, radius = ARCH_RADIUS, top = ARCH_TOP, height = STOREY): THREE.Shape {
   const shape = new THREE.Shape()
   shape.moveTo(-width / 2, 0)
-  shape.lineTo(-ARCH_RADIUS, 0)
-  archPath(shape, ARCH_RADIUS, ARCH_TOP)
+  shape.lineTo(-radius, 0)
+  archPath(shape, radius, top)
   shape.lineTo(width / 2, 0)
-  shape.lineTo(width / 2, STOREY)
-  shape.lineTo(-width / 2, STOREY)
+  shape.lineTo(width / 2, height)
+  shape.lineTo(-width / 2, height)
   shape.closePath()
   return shape
 }
@@ -143,7 +144,11 @@ class Parts {
   }
 }
 
-export function createColosseumBuilding(): THREE.Group {
+/**
+ * `grandGate` replaces the lower two storeys of the three east bays with one tall arch, so the gate
+ * stays walkable when the building is shown shrunk.
+ */
+export function createColosseumBuilding(options: { grandGate: boolean }): THREE.Group {
   const travertine = new THREE.MeshStandardMaterial({ color: '#cdb894', roughness: 0.95, flatShading: true, ...surface('stone') })
   const brick = new THREE.MeshStandardMaterial({ color: '#a8775a', roughness: 1, flatShading: true, ...surface('stone') })
   const seats = new THREE.MeshStandardMaterial({ color: '#bcac8c', roughness: 1, flatShading: true, ...surface('stone') })
@@ -159,13 +164,18 @@ export function createColosseumBuilding(): THREE.Group {
 
   for (let k = 0; k < BAYS; k++) {
     const storeys = outerStoreys(k)
+    const inGate = options.grandGate && (k === BAYS - 1 || k <= 1)
     const { matrix, width } = bayFrame(k, OUTER)
     for (let s = 0; s < storeys; s++) {
       const y = s * STOREY
       const attic = s === 3
-      outer.add(extrude(attic ? atticWall(width + 0.02, k % 2 === 0) : archedWall(width + 0.02), OUTER_DEPTH), matrix, 0, y)
+      const gateStorey = inGate && s < 2
+      if (gateStorey && s === 0) continue // the gate arch rises through it, with no cornice across
+      if (!gateStorey) {
+        outer.add(extrude(attic ? atticWall(width + 0.02, k % 2 === 0) : archedWall(width + 0.02), OUTER_DEPTH), matrix, 0, y)
+      }
       // Half columns below, flat pilasters on the attic, at each edge that ends a standing bay.
-      const edges = [-1, ...(outerStoreys((k + 1) % BAYS) <= s ? [1] : [])]
+      const edges = gateStorey ? [] : [-1, ...(outerStoreys((k + 1) % BAYS) <= s ? [1] : [])]
       for (const side of edges) {
         const shaft = attic
           ? new THREE.BoxGeometry(0.6, STOREY - CORNICE, 0.3)
@@ -182,7 +192,7 @@ export function createColosseumBuilding(): THREE.Group {
       )
     }
     // The ground arches are barred with iron, all but the gate and the one opposite.
-    if (storeys > 0 && k !== 0 && k !== BAYS / 2) {
+    if (storeys > 0 && k !== 0 && k !== BAYS / 2 && !inGate) {
       for (let i = 1; i < 8; i++) {
         const x = -ARCH_RADIUS + (i * 2 * ARCH_RADIUS) / 8
         const height = ARCH_TOP - ARCH_RADIUS + Math.sqrt(ARCH_RADIUS ** 2 - x ** 2) - 0.05
@@ -194,7 +204,7 @@ export function createColosseumBuilding(): THREE.Group {
     // The vaulted floors of the corridor between the rings, under every storey still standing.
     const corridor = bayFrame(k, (INNER_FACE + OUTER - OUTER_DEPTH) / 2)
     const corridorDepth = OUTER - OUTER_DEPTH - INNER_FACE + 0.2
-    for (let s = 1; s <= Math.min(storeys, 3); s++) {
+    for (let s = inGate ? 2 : 1; s <= Math.min(storeys, 3); s++) {
       outer.add(new THREE.BoxGeometry(bayFrame(k, OUTER).width, 0.5, corridorDepth), corridor.matrix, 0, s * STOREY - 0.25)
     }
 
@@ -212,6 +222,13 @@ export function createColosseumBuilding(): THREE.Group {
         shadow.add(new THREE.PlaneGeometry(1.4, 1.6).rotateY(Math.PI), at, 0, wall.y + 0.8, -0.06)
       }
     }
+  }
+
+  if (options.grandGate) {
+    const gate = bayFrame(BAYS - 1, OUTER, 3)
+    outer.add(extrude(archedWall(gate.width + 0.02, 4.2, 13, 2 * STOREY), OUTER_DEPTH), gate.matrix)
+    const shaft = new THREE.CylinderGeometry(COLUMN_RADIUS, COLUMN_RADIUS, 2 * STOREY - CORNICE, 8)
+    outer.add(shaft, gate.matrix, -gate.width / 2, STOREY - CORNICE / 2)
   }
 
   // The gates onto the sand at both ends of the long axis; the east one leads out.

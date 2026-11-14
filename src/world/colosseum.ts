@@ -35,7 +35,7 @@ export function createColosseum(): World {
   )
   ground.rotation.x = -Math.PI / 2
   ground.receiveShadow = true
-  scene.add(ground, createColosseumBuilding())
+  scene.add(ground, createColosseumBuilding({ grandGate: false }))
 
   // A few steps in from the east gate, facing down the long axis.
   const gate = { position: new THREE.Vector3(ARENA_A - 4, EYE_HEIGHT, 0), yaw: Math.PI / 2 }

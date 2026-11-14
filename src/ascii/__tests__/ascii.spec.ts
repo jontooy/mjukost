@@ -84,9 +84,9 @@ describe('drawMinimap', () => {
       return [(i % grid.cols) - 58, Math.floor(i / grid.cols) - 22]
     }
     for (const line of FOREST_MAP.art) expect(line.length).toBe(40)
-    expect(dotAt(0, 5)).toEqual([33, 13]) // spawn, on the road below the gate
-    expect(dotAt(-95, -60)).toEqual([12, 5]) // the middle of the Colosseum
-    expect(dotAt(0, 500)).toEqual([33, 15]) // far down the road
+    expect(dotAt(0, 5)).toEqual([25, 9]) // spawn, on the road below the gate
+    expect(dotAt(-60, -40)).toEqual([8, 2]) // the middle of the Colosseum
+    expect(dotAt(0, 500)).toEqual([25, 15]) // far down the road
     expect(dotAt(-500, -500)).toEqual([0, 0])
   })
 
