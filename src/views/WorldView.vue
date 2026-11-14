@@ -4,7 +4,7 @@ import { marked } from 'marked'
 import * as THREE from 'three'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Grid } from '@/ascii/grid'
-import { drawCrosshair, drawError, drawLoading, drawPlate, drawTitle } from '@/ascii/overlays'
+import { drawCrosshair, drawError, drawLoading, drawMinimap, drawPlate, drawTitle } from '@/ascii/overlays'
 import { playDoorOpening } from '@/audio/doorSound'
 import { playVoice } from '@/audio/voice'
 import DialogueBox from '@/components/DialogueBox.vue'
@@ -198,6 +198,8 @@ function drawOverlay(grid: Grid, camera: THREE.PerspectiveCamera, elapsed: numbe
     ? `XYZ: ${x.toFixed(1)} / ${(y - EYE_HEIGHT).toFixed(1)} / ${z.toFixed(1)}`
     : null
   drawTitle(grid, WORLD_TITLES[worldName.value], coordinates)
+  const map = engine.world?.map
+  if (map && mode.value === 'walk' && !consoleOpen.value) drawMinimap(grid, map, x, z)
   if (mode.value === 'walk') drawCrosshair(grid)
   const plate = engine.world?.door?.targets[0]
   if (mode.value === 'door' && plate && plateState)
