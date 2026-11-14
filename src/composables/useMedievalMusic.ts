@@ -12,6 +12,7 @@ const WORLD_PRESETS: Record<WorldName, (Omit<EngineSettings, 'seed'> & { reverbW
   forest: { mode: 'dorian', danceForm: 'estampie', tempo: 132, reverbWet: 0.25 },
   castle: { mode: 'phrygian', danceForm: 'slowAir', tempo: 72, reverbWet: 0.5 },
   dungeon: null,
+  colosseum: { mode: 'mixolydian', danceForm: 'saltarello', tempo: 120, reverbWet: 0.4 },
 }
 
 // Off unless the visitor turned it up before; the level survives a refresh.

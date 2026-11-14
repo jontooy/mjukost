@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { Grid } from './grid'
 import { projectRect } from './worldText'
 import { SLOT_WIDTH, SLOT_HEIGHT, SLOT_REGIONS, type SlotState, type Field, type Rect } from '@/world/paperCanvas'
+import type { WorldMap } from '@/world/engine'
 
 const AMBER = '#ffd479'
 const INK = '#f3e3b5'
@@ -10,6 +11,11 @@ const FIELD_BG = '#2a2118'
 const ERROR = '#ff8a6c'
 const CHEESE = '#f3af1a'
 const DOTS = '#14100a'
+const MAP_BG = '#0f0c08'
+const MAP_STONE = '#b8b2a4'
+const PLAYER = '#ff2a1a'
+// Map glyphs with their own colour; every other glyph is stone.
+const MAP_COLOURS: Record<string, string> = { '^': '#5d8a45', ':': '#a8804f', '.': '#e0c98f' }
 
 // A wedge after the reference sketch: sloped top face, holes, two old bites in the rind.
 const CHEESE_ART = [
@@ -132,6 +138,38 @@ export function drawTitle(grid: Grid, title: string, coordinates: string | null)
   if (coordinates === null) return
   grid.clearBox(1, 5, coordinates.length + 2, 1)
   grid.text(2, 5, coordinates, INK)
+}
+
+/**
+ * `map` in a box in the bottom right, with the player at world (x, z) as a red dot, pinned to
+ * the map's edge when outside it. Skipped when the box would take more than half the width.
+ */
+export function drawMinimap(grid: Grid, map: WorldMap, x: number, z: number): void {
+  const cols = map.art[0]!.length
+  const rows = map.art.length
+  if (2 * (cols + 3) > grid.cols) return
+  const left = grid.cols - cols - 3
+  const top = grid.rows - rows - 3
+  grid.clearBox(left, top, cols + 2, rows + 2)
+  for (let cy = top; cy < top + rows + 2; cy++) {
+    for (let cx = left; cx < left + cols + 2; cx++) grid.setBg(cx, cy, MAP_BG)
+  }
+  const line = '─'.repeat(cols)
+  grid.text(left, top, `┌${line}┐`, EDGE)
+  grid.text(left, top + rows + 1, `└${line}┘`, EDGE)
+  for (let row = 0; row < rows; row++) {
+    const y = top + 1 + row
+    grid.text(left, y, '│', EDGE)
+    grid.text(left + cols + 1, y, '│', EDGE)
+    const art = map.art[row]!
+    for (let col = 0; col < cols; col++) {
+      const glyph = art[col]!
+      grid.text(left + 1 + col, y, glyph, MAP_COLOURS[glyph] ?? MAP_STONE)
+    }
+  }
+  const dotCol = THREE.MathUtils.clamp(Math.floor((x - map.west) / map.metresPerCol), 0, cols - 1)
+  const dotRow = THREE.MathUtils.clamp(Math.floor((z - map.north) / map.metresPerRow), 0, rows - 1)
+  grid.text(left + 1 + dotCol, top + 1 + dotRow, '●', PLAYER)
 }
 
 export function drawCrosshair(grid: Grid): void {

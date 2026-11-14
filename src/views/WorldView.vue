@@ -4,7 +4,7 @@ import { marked } from 'marked'
 import * as THREE from 'three'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Grid } from '@/ascii/grid'
-import { drawCrosshair, drawError, drawLoading, drawPlate, drawTitle } from '@/ascii/overlays'
+import { drawCrosshair, drawError, drawLoading, drawMinimap, drawPlate, drawTitle } from '@/ascii/overlays'
 import { playDoorOpening } from '@/audio/doorSound'
 import { playVoice } from '@/audio/voice'
 import DialogueBox from '@/components/DialogueBox.vue'
@@ -21,6 +21,7 @@ import { DIALOGUES, type Dialogue } from '@/world/dialogue'
 import { EYE_HEIGHT, Engine, type Portal, type PortalDialogue, type WorldName } from '@/world/engine'
 import { createForest } from '@/world/forest'
 import { createDungeon } from '@/world/dungeon'
+import { createColosseum } from '@/world/colosseum'
 import type { Field, SlotState } from '@/world/paperCanvas'
 
 type Mode = 'walk' | 'read' | 'write' | 'door' | 'talk'
@@ -29,6 +30,7 @@ const WORLD_TITLES: Record<WorldName, string> = {
   forest: 'Mjukost Forest',
   castle: 'Hall of Cream Cheese',
   dungeon: 'The Cheese Cave',
+  colosseum: 'The Colocheeseum',
 }
 
 interface Hover {
@@ -120,7 +122,9 @@ async function enter(name: WorldName, from?: WorldName) {
         ? createDungeon()
         : name === 'castle'
           ? createCastle({ signedIn: auth.isAuthenticated })
-          : createForest({ signedIn: auth.isAuthenticated })
+          : name === 'colosseum'
+            ? createColosseum()
+            : createForest({ signedIn: auth.isAuthenticated })
     engine.setWorld(world, from)
     controls.syncFromCamera()
     worldName.value = name
@@ -198,6 +202,8 @@ function drawOverlay(grid: Grid, camera: THREE.PerspectiveCamera, elapsed: numbe
     ? `XYZ: ${x.toFixed(1)} / ${(y - EYE_HEIGHT).toFixed(1)} / ${z.toFixed(1)}`
     : null
   drawTitle(grid, WORLD_TITLES[worldName.value], coordinates)
+  const map = engine.world?.map
+  if (map && mode.value === 'walk' && !consoleOpen.value) drawMinimap(grid, map, x, z)
   if (mode.value === 'walk') drawCrosshair(grid)
   const plate = engine.world?.door?.targets[0]
   if (mode.value === 'door' && plate && plateState)
@@ -594,7 +600,7 @@ function savePosition() {
 // A fresh visit starts in the forest, or before the throne for a signed-in visitor; signed-out visitors never resume past the gate guards.
 async function restorePosition() {
   const saved = JSON.parse(sessionStorage.getItem(POSITION_KEY) ?? 'null') as SavedPosition | null
-  if (!saved || (saved.world !== 'forest' && !auth.isAuthenticated)) {
+  if (!saved || ((saved.world === 'castle' || saved.world === 'dungeon') && !auth.isAuthenticated)) {
     return enter(auth.isAuthenticated ? 'castle' : 'forest')
   }
   await enter(saved.world)

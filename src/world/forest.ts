@@ -4,6 +4,8 @@ import { createBlankPainting, createOfflinePainting, createPainting, createPendi
 import { DOOR_HALF_WIDTH, DOOR_HEIGHT, createDoorLeaf, swingDoorLeaf } from '@/world/door'
 import { EYE_HEIGHT, type Interactable, type World } from '@/world/engine'
 import { createGuard } from '@/world/guard'
+import { GATE_X, GATE_Z, createArena, nearArena, pushOutOfArena } from '@/world/arena'
+import { FOREST_MAP } from '@/world/forestMap'
 import { seededRandom } from '@/lib/random'
 import { surface } from '@/ascii/surfaces'
 
@@ -165,6 +167,7 @@ export function createForest(options: { signedIn: boolean }): World {
   }
 
   scene.add(createCastleGate(options.signedIn))
+  scene.add(createArena())
 
   const fireflies = createFireflies(seededRandom(WORLD_SEED))
   scene.add(fireflies.points)
@@ -176,7 +179,12 @@ export function createForest(options: { signedIn: boolean }): World {
     name: 'forest',
     scene,
     spawn,
-    arrivals: { castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI } },
+    map: FOREST_MAP,
+    arrivals: {
+      castle: { position: new THREE.Vector3(0, EYE_HEIGHT, 4), yaw: Math.PI },
+      // Out of the Colosseum's gate, facing down the path.
+      colosseum: { position: new THREE.Vector3(GATE_X + 3, EYE_HEIGHT, GATE_Z), yaw: -Math.PI / 2 },
+    },
     interactables,
     // Signed-out visitors are stopped a step before the guards and turned to the right one, who speaks.
     portals: [
@@ -192,9 +200,11 @@ export function createForest(options: { signedIn: boolean }): World {
               lookAt: new THREE.Vector3(GATE_GUARDS[1]!.x, GUARD_FACE_HEIGHT, GATE_GUARDS[1]!.z),
             },
       },
+      { position: new THREE.Vector3(GATE_X, EYE_HEIGHT, GATE_Z), radius: 1.3, to: 'colosseum' },
     ],
     clamp(position) {
       pushOutOfCastle(position)
+      pushOutOfArena(position)
       woods.collide(position)
     },
     update(_dt, elapsed, viewer) {
@@ -378,11 +388,11 @@ function chunkTrees(cx: number, cz: number): Tree[] {
   return trees
 }
 
-// Open ground around the castle, and along the road, which runs from the gate on forever.
+// Open ground around the castle, along the road, which runs from the gate on forever, and around the arena and its path.
 function inClearing(tree: Tree) {
   const nearCastle = Math.abs(tree.x) < 24 && tree.z > -2 * CASTLE_HALF - 10 && tree.z < 6
   const nearRoad = Math.abs(tree.x) < 6 + tree.trunkRadius && tree.z > -2
-  return nearCastle || nearRoad
+  return nearCastle || nearRoad || nearArena(tree.x, tree.z, tree.trunkRadius)
 }
 
 function crownGeometry() {

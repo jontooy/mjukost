@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { Grid, col2str } from '@/ascii/grid'
 import { convertFrame, type FrameInput } from '@/ascii/convert'
+import { drawMinimap } from '@/ascii/overlays'
+import { FOREST_MAP } from '@/world/forestMap'
 import { surfaceIndex, glyphAt } from '@/ascii/surfaces'
 
 describe('convertFrame', () => {
@@ -66,5 +68,32 @@ describe('glyphAt', () => {
     const a = glyphAt(surfaceIndex('grass'), near)
     const b = glyphAt(surfaceIndex('grass'), near)
     expect(a).toBe(b)
+  })
+})
+
+describe('drawMinimap', () => {
+  it('puts the player dot on the forest map cell under them, pinned to the edge when off the map', () => {
+    const grid = new Grid()
+    grid.allocate(100, 40)
+    // The box is 42 x 18 with a one-cell margin, so the map's first cell is (58, 22).
+    const dotAt = (x: number, z: number) => {
+      grid.clear()
+      drawMinimap(grid, FOREST_MAP, x, z)
+      const i = grid.glyph.indexOf('●')
+      expect(grid.colour[i]).toBe('#ff2a1a')
+      return [(i % grid.cols) - 58, Math.floor(i / grid.cols) - 22]
+    }
+    for (const line of FOREST_MAP.art) expect(line.length).toBe(40)
+    expect(dotAt(0, 5)).toEqual([25, 9]) // spawn, on the road below the gate
+    expect(dotAt(-60, -40)).toEqual([8, 2]) // the middle of the Colosseum
+    expect(dotAt(0, 500)).toEqual([25, 15]) // far down the road
+    expect(dotAt(-500, -500)).toEqual([0, 0])
+  })
+
+  it('draws nothing when the map would take more than half the width', () => {
+    const grid = new Grid()
+    grid.allocate(80, 40)
+    drawMinimap(grid, FOREST_MAP, 0, 5)
+    expect(grid.glyph.every((glyph) => glyph === '')).toBe(true)
   })
 })

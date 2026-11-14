@@ -7,7 +7,7 @@ import type { Grid } from '@/ascii/grid'
 
 export type WorldAction = { kind: 'read'; post: Post } | { kind: 'new'; isPrivate: boolean; slot: number }
 
-export type WorldName = 'forest' | 'castle' | 'dungeon'
+export type WorldName = 'forest' | 'castle' | 'dungeon' | 'colosseum'
 
 export interface Interactable {
   object: THREE.Object3D
@@ -36,6 +36,18 @@ export interface Placement {
   yaw: number
 }
 
+/** A fixed top-down map of a world, north (-z) up and east (+x) right, drawn in the bottom right corner. */
+export interface WorldMap {
+  /** One string per row, north to south; every row the same length. */
+  art: readonly string[]
+  /** World x of the left edge of the first column. */
+  west: number
+  /** World z of the top edge of the first row. */
+  north: number
+  metresPerCol: number
+  metresPerRow: number
+}
+
 export interface World {
   name: WorldName
   scene: THREE.Scene
@@ -43,6 +55,8 @@ export interface World {
   arrivals: Partial<Record<WorldName, Placement>>
   interactables: Interactable[]
   door?: CastleDoor
+  /** Worlds without a minimap omit it. */
+  map?: WorldMap
   portals: Portal[]
   clamp(position: THREE.Vector3): void
   update?(dt: number, elapsed: number, viewer: THREE.Vector3): void
